@@ -63,8 +63,9 @@ jobs:
         run: dotnet tool install -g vpk --version ${{ env.VELOPACK_VERSION }}
 
       # Previous release's package, so vpk can build a delta update. Fails on the very first release.
+      # The token avoids GitHub's anonymous API rate limit (403) on shared runner IPs.
       - name: Download previous release
-        run: vpk download github --repoUrl "${{ env.REPO_URL }}" -o Releases
+        run: vpk download github --repoUrl "${{ env.REPO_URL }}" --token ${{ secrets.GITHUB_TOKEN }} -o Releases
         continue-on-error: true
 
       - name: Pack
@@ -78,14 +79,24 @@ jobs:
           vpk upload github --repoUrl "${{ env.REPO_URL }}" --token ${{ secrets.GITHUB_TOKEN }}
           -o Releases --publish true --releaseName "${{ env.APP_TITLE }} v${{ env.VERSION }}" --tag ${{ github.ref_name }}
 
-      # The in-app updater reads releases/latest/download/releases.win.json.
+      # The in-app updater reads this feed anonymously, exactly like this step. Retry briefly: GitHub's CDN can lag a few seconds.
       - name: Verify release is visible to the updater
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         run: |
-          feed=$(curl -sfL "$REPO_URL/releases/latest/download/releases.win.json") || feed=""
-          if ! grep -qF "\"Version\":\"$VERSION\"" <<< "$feed"; then
-            echo "::error::releases/latest/download/releases.win.json does not list $VERSION, so installed apps will not detect this update."
-            exit 1
+          url="$REPO_URL/releases/latest/download/releases.win.json"
+          for attempt in 1 2 3 4 5 6; do
+            code=$(curl -sL -o feed.json -w "%{http_code}" "$url" || true)
+            if [[ "$code" == "200" ]] && grep -qF "\"Version\":\"$VERSION\"" feed.json; then
+              echo "Feed lists $VERSION (attempt $attempt)"
+              exit 0
+            fi
+            echo "Attempt $attempt: HTTP $code, feed does not list $VERSION yet"
+            sleep 10
+          done
+          if [[ "$code" == "404" ]]; then
+            echo "::error::$url returned 404 for an anonymous request. If the repository is private, installed apps cannot read releases either: make the repository public or publish releases to a public repository."
+          else
+            echo "::error::$url (HTTP $code) does not list $VERSION, so installed apps will not detect this update."
           fi
-          echo "Feed lists $VERSION"
+          exit 1

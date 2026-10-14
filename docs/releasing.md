@@ -37,3 +37,9 @@ Installed apps never downgrade. To roll back a bad release, publish a fixed high
 
 - Windows x64 only. macOS/Linux packaging is future work.
 - Installers are **not code-signed**, so Windows SmartScreen may warn on first install. Signing (SignPath, Azure Trusted Signing or a certificate) is a follow-up.
+
+## The repository (or the release repository) must be public
+
+The in-app updater and the workflow's "Verify release is visible to the updater" step read the release feed **anonymously**. For a private repository GitHub answers 404 to anonymous requests, so installed apps would never see an update (and the verify step fails with an explanatory error). Either make the repository public, or publish the release assets to a separate public repository and point `Snaply:Update:RepoUrl` and `REPO_URL` in the workflow at it. Embedding an access token in the app is not an option: anything shipped in the app can be extracted.
+
+`vpk download` in the workflow uses the job's `GITHUB_TOKEN` so it is not subject to GitHub's anonymous rate limit (a 403 "rate limit exceeded" is what the first run showed).
