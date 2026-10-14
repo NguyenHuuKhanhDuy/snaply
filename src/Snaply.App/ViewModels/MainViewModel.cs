@@ -44,6 +44,9 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _services = services; _hub = hub; _capture = capture;
         Notifications = notifications; Dialogs = dialogs;
+        Updates = services.GetRequiredService<UpdateBannerViewModel>();
+        Updates.IsEditorOpen = () => IsEditorOpen;
+        Updates.PrepareForRestart = () => CloseEditorAsync(restore: false);
 
         _home = services.GetRequiredService<HomeViewModel>();
         _home.NavigateTo = Navigate;
@@ -69,6 +72,7 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     public NotificationService Notifications { get; }
+    public UpdateBannerViewModel Updates { get; }
     public DialogService Dialogs { get; }
     public ObservableCollection<NavItemViewModel> NavItems { get; }
 

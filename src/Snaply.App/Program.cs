@@ -1,5 +1,6 @@
 using Avalonia;
 using Snaply.App.Services;
+using Velopack;
 
 namespace Snaply.App;
 
@@ -11,6 +12,9 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // Must run first: handles install/update/uninstall hooks and exits quickly when Velopack launched us for one.
+        VelopackApp.Build().Run();
+
         InitialCommand = StartupCommands.Parse(args);
 
         // Tests and portable runs can use a separate scope so they never collide with the user's instance.

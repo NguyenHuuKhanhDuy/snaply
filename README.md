@@ -52,6 +52,10 @@ Tesseract runs locally. Snaply never downloads language data automatically. Put 
 - **Linux:** install one capture tool (X11: `maim`, `scrot` or ImageMagick `import`; Wayland: `grim`, `gnome-screenshot` or `spectacle`) and `xclip`/`wl-clipboard` for clipboard. The XDG desktop portal is not used yet.
 - **Windows:** per-monitor DPI aware via the app manifest.
 
+## Updates and privacy
+
+Installed builds can check GitHub Releases for a newer version (Settings → Updates). The check is optional, sends no screenshots or personal data, and never installs anything without a click. See [docs/releasing.md](docs/releasing.md).
+
 ## Documentation
 
 See [docs/architecture.md](docs/architecture.md), [docs/qa-checklist.md](docs/qa-checklist.md), [docs/packaging.md](docs/packaging.md). Change proposal, design and specs live in `openspec/changes/build-snaply-app/`.

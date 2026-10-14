@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+env:
+  # Velopack installs to LOCALAPPDATA/<pack id>. Snaply keeps screenshots and its database in LOCALAPPDATA/Snaply,
+  # so the pack id must differ or an uninstall/update could delete user data.
+  APP_ID: SnaplyApp
+  APP_TITLE: Snaply
+  APP_EXE: Snaply.exe
+  PROJECT: src/Snaply.App/Snaply.App.csproj
+  ICON: src/Snaply.App/Assets/snaply.ico
+  REPO_URL: https://github.com/${{ github.repository }}
+  # Must equal the Velopack package version in Directory.Packages.props; a mismatch breaks updates.
+  VELOPACK_VERSION: 1.2.0
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # A manual workflow_dispatch run has no tag: it builds/packs a throwaway version and skips publishing.
+      - name: Determine version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=0.0.1-ci.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Check Velopack versions match
+        shell: bash
+        run: |
+          pkg=$(grep -oP '<PackageVersion Include="Velopack" Version="\K[^"]+' Directory.Packages.props)
+          if [[ "$pkg" != "$VELOPACK_VERSION" ]]; then
+            echo "::error::Directory.Packages.props pins Velopack $pkg but the workflow uses vpk $VELOPACK_VERSION. Keep them identical."
+            exit 1
+          fi
+
+      # Never ship a build that does not pass the tests.
+      - name: Test
+        run: dotnet test Snaply.sln -c Release
+
+      - name: Publish
+        run: >
+          dotnet publish ${{ env.PROJECT }} -c Release -r win-x64 --self-contained true
+          -p:Version=${{ env.VERSION }} -o publish
+
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk --version ${{ env.VELOPACK_VERSION }}
+
+      # Previous release's package, so vpk can build a delta update. Fails on the very first release.
+      - name: Download previous release
+        run: vpk download github --repoUrl "${{ env.REPO_URL }}" -o Releases
+        continue-on-error: true
+
+      - name: Pack
+        run: >
+          vpk pack -u ${{ env.APP_ID }} -v ${{ env.VERSION }} -p publish
+          -e ${{ env.APP_EXE }} --packTitle ${{ env.APP_TITLE }} -i ${{ env.ICON }} -o Releases
+
+      - name: Upload to GitHub
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: >
+          vpk upload github --repoUrl "${{ env.REPO_URL }}" --token ${{ secrets.GITHUB_TOKEN }}
+          -o Releases --publish true --releaseName "${{ env.APP_TITLE }} v${{ env.VERSION }}" --tag ${{ github.ref_name }}
+
+      # The in-app updater reads releases/latest/download/releases.win.json.
+      - name: Verify release is visible to the updater
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          feed=$(curl -sfL "$REPO_URL/releases/latest/download/releases.win.json") || feed=""
+          if ! grep -qF "\"Version\":\"$VERSION\"" <<< "$feed"; then
+            echo "::error::releases/latest/download/releases.win.json does not list $VERSION, so installed apps will not detect this update."
+            exit 1
+          fi
+          echo "Feed lists $VERSION"

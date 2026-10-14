@@ -102,6 +102,9 @@ public partial class App : Application
         s.AddSingleton<CaptureOrchestrator>();
         s.AddSingleton<CaptureCoordinator>();
         s.AddSingleton<HotkeyManager>();
+        s.AddSingleton<IAppUpdateService, VelopackUpdateService>();
+        s.AddSingleton<UpdateCoordinator>();
+        s.AddSingleton<UpdateBannerViewModel>();
         s.AddSingleton<ScreenshotActions>();
 
         s.AddSingleton<IOcrService>(p => new TesseractOcrService(
@@ -135,8 +138,24 @@ public partial class App : Application
     {
         await main.InitializeAsync();
         StartHotkeys();
+        StartUpdateChecks(main);
         Program.Instance?.Listen(cmd => Dispatcher.UIThread.Post(() => _ = RunCommandAsync(cmd)));
         if (Program.InitialCommand != StartupCommand.Open) await RunCommandAsync(Program.InitialCommand);
+    }
+
+    private void StartUpdateChecks(MainViewModel main)
+    {
+        var coordinator = _services!.GetRequiredService<UpdateCoordinator>();
+        var capture = _services!.GetRequiredService<CaptureOrchestrator>();
+        coordinator.IsCaptureActive = () => capture.IsBusy;
+        main.Updates.Refresh();
+
+        // Background check a few seconds after startup; failures are silent and the setting/cooldown are handled by the coordinator.
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(10));
+            await coordinator.CheckAsync(manual: false);
+        });
     }
 
     private void StartHotkeys()

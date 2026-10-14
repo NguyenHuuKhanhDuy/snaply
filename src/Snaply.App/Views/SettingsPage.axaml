@@ -188,6 +188,27 @@
         </StackPanel>
       </c:SectionCard>
 
+      <!-- Updates -->
+      <c:SectionCard Title="Updates" Description="Snaply checks the public GitHub release list. No screenshots or personal data are sent.">
+        <StackPanel DataContext="{Binding Updates}" x:DataType="vm:UpdateBannerViewModel">
+          <c:SettingsRow Title="Current version" Description="{Binding LastCheckedText}">
+            <TextBlock Text="{Binding CurrentVersion}" FontWeight="Medium" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Status" Description="{Binding StatusText}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="ghost" Content="Release notes" Command="{Binding ShowNotesCommand}" IsVisible="{Binding HasNotes}" />
+              <Button Classes="primary" Content="Update now" Command="{Binding UpdateNowCommand}" IsVisible="{Binding ShowUpdateNow}" />
+              <Button Classes="secondary" Content="Check for updates" Command="{Binding CheckNowCommand}" IsEnabled="{Binding CanCheck}" />
+            </StackPanel>
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Check automatically" Description="Looks for a new version shortly after Snaply starts, at most every 6 hours. Turn off to check only when you press the button.">
+            <ToggleSwitch IsChecked="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).AutoCheckUpdates}" OnContent="" OffContent="" AutomationProperties.Name="Check for updates automatically" />
+          </c:SettingsRow>
+        </StackPanel>
+      </c:SectionCard>
+
       <!-- About -->
       <c:SectionCard Title="About">
         <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="24" RowSpacing="8" Margin="0,12">

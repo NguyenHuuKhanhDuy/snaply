@@ -33,6 +33,9 @@ public sealed class CaptureOrchestrator
         _selector = selector; _window = window; _notifications = notifications; _log = log;
     }
 
+    /// <summary>True while a capture (including its overlay) is running.</summary>
+    public bool IsBusy => _gate.CurrentCount == 0;
+
     public LastCapture? Last { get; private set; }
 
     public async Task<Result<CaptureOutcome>> CaptureAsync(CaptureMode mode, int? delaySecondsOverride = null, CancellationToken ct = default)

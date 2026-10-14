@@ -505,3 +505,194 @@ public class FrameMappingTests
         Assert.Equal(new PixelRect(20, 10, 80, 60), r);
     }
 }
+
+public class UpdateCoordinatorTests
+{
+    private readonly IAppUpdateService _service = Substitute.For<IAppUpdateService>();
+    private readonly IApplicationSettingsService _settings = Substitute.For<IApplicationSettingsService>();
+    private readonly AppSettings _s = new();
+    private DateTime _now = new(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc);
+    private static readonly UpdateInfo V2 = new("2.0.0", "notes", new object());
+
+    public UpdateCoordinatorTests()
+    {
+        _service.IsSupported.Returns(true);
+        _service.CurrentVersion.Returns("1.0.0");
+        _settings.Current.Returns(_s);
+        _settings.UpdateAsync(Arg.Any<Action<AppSettings>>(), Arg.Any<CancellationToken>()).Returns(ci => { ci.Arg<Action<AppSettings>>()(_s); return Result.Ok(); });
+        _service.CheckAsync(Arg.Any<CancellationToken>()).Returns(Result<UpdateInfo?>.Ok(V2));
+        _service.DownloadAsync(Arg.Any<UpdateInfo>(), Arg.Any<IProgress<int>>(), Arg.Any<CancellationToken>()).Returns(Result.Ok());
+    }
+
+    private UpdateCoordinator Sut() => new(_service, _settings, NullLogger<UpdateCoordinator>.Instance, () => _now);
+
+    [Fact]
+    public async Task Newer_version_makes_banner_visible_and_stamps_last_check()
+    {
+        var c = Sut();
+        await c.CheckAsync(manual: false);
+        Assert.Equal(UpdateState.Available, c.State);
+        Assert.True(c.BannerVisible);
+        Assert.Equal(_now, _s.LastUpdateCheckUtc);
+    }
+
+    [Fact]
+    public async Task Up_to_date_is_reported()
+    {
+        _service.CheckAsync(default).ReturnsForAnyArgs(Result<UpdateInfo?>.Ok(null));
+        var c = Sut();
+        await c.CheckAsync(manual: true);
+        Assert.Equal(UpdateState.UpToDate, c.State);
+        Assert.False(c.BannerVisible);
+    }
+
+    [Fact]
+    public async Task Automatic_check_respects_six_hour_cooldown_but_manual_does_not()
+    {
+        var c = Sut();
+        await c.CheckAsync(false);
+        _service.ClearReceivedCalls();
+        _now = _now.AddHours(5);
+        await c.CheckAsync(false);
+        await _service.DidNotReceiveWithAnyArgs().CheckAsync(default);
+        await c.CheckAsync(true);
+        await _service.ReceivedWithAnyArgs(1).CheckAsync(default);
+        _now = _now.AddHours(7);
+        await c.CheckAsync(false);
+        await _service.ReceivedWithAnyArgs(2).CheckAsync(default);
+    }
+
+    [Fact]
+    public async Task Automatic_checks_off_makes_no_request_but_manual_still_works()
+    {
+        _s.AutoCheckUpdates = false;
+        var c = Sut();
+        await c.CheckAsync(false);
+        await _service.DidNotReceiveWithAnyArgs().CheckAsync(default);
+        await c.CheckAsync(true);
+        await _service.ReceivedWithAnyArgs(1).CheckAsync(default);
+    }
+
+    [Fact]
+    public async Task Offline_automatic_check_is_silent_manual_reports()
+    {
+        _service.CheckAsync(default).ReturnsForAnyArgs(Result<UpdateInfo?>.Fail(ErrorCode.Failed, "Could not reach the update server."));
+        var c = Sut();
+        await c.CheckAsync(false);
+        Assert.Equal(UpdateState.Idle, c.State);
+        Assert.Null(c.Message);
+        Assert.Null(_s.LastUpdateCheckUtc); // a failed check must not start the cooldown
+
+        await c.CheckAsync(true);
+        Assert.Equal(UpdateState.Failed, c.State);
+        Assert.Equal("Could not reach the update server.", c.Message);
+    }
+
+    [Fact]
+    public async Task Unsupported_build_makes_no_request_and_manual_explains()
+    {
+        _service.IsSupported.Returns(false);
+        _service.UnsupportedReason.Returns("Updates are not available in this build.");
+        var c = Sut();
+        await c.CheckAsync(false);
+        await c.CheckAsync(true);
+        await _service.DidNotReceiveWithAnyArgs().CheckAsync(default);
+        Assert.Equal("Updates are not available in this build.", c.Message);
+    }
+
+    [Fact]
+    public async Task Later_hides_banner_for_that_version_only()
+    {
+        var c = Sut();
+        await c.CheckAsync(true);
+        c.Dismiss();
+        Assert.False(c.BannerVisible);
+        _service.CheckAsync(default).ReturnsForAnyArgs(Result<UpdateInfo?>.Ok(new UpdateInfo("3.0.0", null, new object())));
+        await c.CheckAsync(true);
+        Assert.True(c.BannerVisible);
+    }
+
+    [Fact]
+    public async Task Download_success_reaches_ready_and_reports_progress()
+    {
+        var seen = new List<int>();
+        _service.DownloadAsync(default!, default!, default).ReturnsForAnyArgs(ci =>
+        {
+            ci.Arg<IProgress<int>>().Report(40);
+            return Result.Ok();
+        });
+        var c = Sut();
+        c.Changed += (_, _) => seen.Add(c.Progress);
+        await c.CheckAsync(true);
+        await c.DownloadAsync();
+        Assert.Equal(UpdateState.Ready, c.State);
+        Assert.Equal(100, c.Progress);
+    }
+
+    [Fact]
+    public async Task Download_failure_keeps_update_available_for_retry()
+    {
+        _service.DownloadAsync(default!, default!, default).ReturnsForAnyArgs(Result.Fail(ErrorCode.Failed, "disk full"));
+        var c = Sut();
+        await c.CheckAsync(true);
+        await c.DownloadAsync();
+        Assert.Equal(UpdateState.Failed, c.State);
+        Assert.Equal("disk full", c.Message);
+        Assert.NotNull(c.Available);
+        Assert.True(c.BannerVisible);
+
+        _service.DownloadAsync(default!, default!, default).ReturnsForAnyArgs(Result.Ok());
+        await c.DownloadAsync();
+        Assert.Equal(UpdateState.Ready, c.State);
+    }
+
+    [Fact]
+    public async Task Restart_is_blocked_while_capturing_and_allowed_after()
+    {
+        var capturing = true;
+        var c = Sut();
+        c.IsCaptureActive = () => capturing;
+        await c.CheckAsync(true);
+        await c.DownloadAsync();
+        Assert.False(c.CanRestartNow);
+        Assert.False(c.RestartNow());
+        _service.DidNotReceiveWithAnyArgs().ApplyAndRestart(default!);
+
+        capturing = false;
+        Assert.True(c.RestartNow());
+        _service.Received(1).ApplyAndRestart(V2);
+    }
+
+    [Fact]
+    public async Task Restart_before_download_is_refused()
+    {
+        var c = Sut();
+        await c.CheckAsync(true);
+        Assert.False(c.RestartNow());
+    }
+
+    [Fact]
+    public async Task Install_on_next_launch_schedules_once()
+    {
+        var c = Sut();
+        await c.CheckAsync(true);
+        await c.DownloadAsync();
+        c.InstallOnNextLaunch();
+        c.InstallOnNextLaunch();
+        _service.Received(1).ApplyOnNextExit(V2);
+        Assert.True(c.InstallScheduled);
+    }
+
+    [Fact]
+    public async Task Second_check_while_busy_is_ignored()
+    {
+        var gate = new TaskCompletionSource<Result<UpdateInfo?>>();
+        _service.CheckAsync(default).ReturnsForAnyArgs(_ => gate.Task);
+        var c = Sut();
+        var first = c.CheckAsync(true);
+        await c.CheckAsync(true);
+        await _service.ReceivedWithAnyArgs(1).CheckAsync(default);
+        gate.SetResult(Result<UpdateInfo?>.Ok(null));
+        await first;
+    }
+}

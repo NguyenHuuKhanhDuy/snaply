@@ -16,6 +16,9 @@ public sealed class AppSettings
     public MonitorTarget FullScreenTarget { get; set; } = MonitorTarget.UnderCursor;
     public int CaptureDelaySeconds { get; set; }
     public bool ReduceMotion { get; set; }
+    /// <summary>Check GitHub for a newer version shortly after startup (no data is sent).</summary>
+    public bool AutoCheckUpdates { get; set; } = true;
+    public DateTime? LastUpdateCheckUtc { get; set; }
     public List<string> OcrLanguages { get; set; } = new() { "eng" };
     public Dictionary<string, string> Hotkeys { get; set; } = new(DefaultHotkeys);
 
@@ -32,6 +35,7 @@ public sealed class AppSettings
         CopyToClipboardAfterCapture = CopyToClipboardAfterCapture, SaveToLibraryAfterCapture = SaveToLibraryAfterCapture, EditAfterSelection = EditAfterSelection,
         OpenEditorAfterCapture = OpenEditorAfterCapture, FullScreenTarget = FullScreenTarget,
         CaptureDelaySeconds = CaptureDelaySeconds, ReduceMotion = ReduceMotion,
+        AutoCheckUpdates = AutoCheckUpdates, LastUpdateCheckUtc = LastUpdateCheckUtc,
         OcrLanguages = new List<string>(OcrLanguages), Hotkeys = new Dictionary<string, string>(Hotkeys),
     };
 }

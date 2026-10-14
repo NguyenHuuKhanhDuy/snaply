@@ -73,10 +73,11 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     public SettingsViewModel(IApplicationSettingsService settings, ThemeService theme, DialogService dialogs, INotificationService notes,
         HotkeyManager hotkeys, IScreenshotLibrary library, IScreenshotRepository repo, IOcrService ocr, IScreenCaptureService capture,
-        IShellService shell, AppPaths paths, LibraryEvents events)
+        IShellService shell, AppPaths paths, LibraryEvents events, UpdateBannerViewModel updates)
     {
         _settings = settings; _theme = theme; _dialogs = dialogs; _notes = notes; _hotkeys = hotkeys; _library = library; _repo = repo;
         _ocr = ocr; _capture = capture; _shell = shell; _paths = paths; _events = events;
+        Updates = updates;
 
         Shortcuts = new ObservableCollection<ShortcutRowViewModel>
         {
@@ -88,6 +89,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
         Refresh();
     }
 
+    public UpdateBannerViewModel Updates { get; }
+
     public IReadOnlyList<int> DelayOptions { get; } = new[] { 0, 3, 5, 10 };
     public IReadOnlyList<string> FormatOptions { get; } = new[] { "PNG (lossless)", "JPEG (smaller)" };
     public ObservableCollection<ShortcutRowViewModel> Shortcuts { get; }
@@ -98,6 +101,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _isDark;
     [ObservableProperty] private bool _isSystem;
     [ObservableProperty] private bool _reduceMotion;
+    [ObservableProperty] private bool _autoCheckUpdates;
 
     // Capture
     [ObservableProperty] private string _saveDirectory = "";
@@ -152,6 +156,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             var s = _settings.Current;
             IsLight = s.Theme == ThemeMode.Light; IsDark = s.Theme == ThemeMode.Dark; IsSystem = s.Theme == ThemeMode.System;
             ReduceMotion = s.ReduceMotion;
+            AutoCheckUpdates = s.AutoCheckUpdates;
             SaveDirectory = _settings.EffectiveSaveDirectory;
             UsesDefaultDirectory = string.IsNullOrWhiteSpace(s.SaveDirectory);
             FormatIndex = s.DefaultFormat == ImageFormat.Jpeg ? 1 : 0;
@@ -205,6 +210,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
         await ApplyAsync(s => s.Theme = mode).ConfigureAwait(true);
         _theme.Apply(_settings.Current.Theme);
     }
+
+    partial void OnAutoCheckUpdatesChanged(bool value) => _ = ApplyAsync(s => s.AutoCheckUpdates = value);
 
     partial void OnReduceMotionChanged(bool value)
     {
