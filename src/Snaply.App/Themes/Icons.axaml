@@ -24,6 +24,13 @@
   <StreamGeometry x:Key="IconCircle">M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16z</StreamGeometry>
   <StreamGeometry x:Key="IconArrow">M5 19L19 5 M9 5h10v10</StreamGeometry>
   <StreamGeometry x:Key="IconType">M5 6V4h14v2 M12 4v16 M9 20h6</StreamGeometry>
+  <StreamGeometry x:Key="IconStyle">M4 7h9 M17 7h3 M4 17h3 M11 17h9 M15 4v6 M9 14v6</StreamGeometry>
+  <StreamGeometry x:Key="IconDashed">M4 12h3 M10.5 12h3 M17 12h3</StreamGeometry>
+  <StreamGeometry x:Key="IconBold">M7 5h6a3.5 3.5 0 0 1 0 7H7z M7 12h7a3.5 3.5 0 0 1 0 7H7z</StreamGeometry>
+  <StreamGeometry x:Key="IconTextBg">M4 6h16v12H4z M8.5 15l2.5-6 2.5 6 M9.4 13h3.2</StreamGeometry>
+  <StreamGeometry x:Key="IconLine">M5 19L19 5</StreamGeometry>
+  <StreamGeometry x:Key="IconPen">M4 20c3-1 4-5 7-8s6-3 7-6 M4 20l3-1</StreamGeometry>
+  <StreamGeometry x:Key="IconSpotlight">M3 3h18v18H3z M9 9h6v6H9z</StreamGeometry>
   <StreamGeometry x:Key="IconShield">M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z</StreamGeometry>
   <StreamGeometry x:Key="IconRedact">M4 6h16v12H4z M7 12h10</StreamGeometry>
   <StreamGeometry x:Key="IconBlur">M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z</StreamGeometry>

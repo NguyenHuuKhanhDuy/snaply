@@ -21,6 +21,8 @@ public sealed class AppSettings
     /// <summary>Check online for a newer version shortly after startup (no data is sent).</summary>
     /// <summary>Closing the window hides it to the system tray so global shortcuts keep working.</summary>
     public bool RunInBackground { get; set; } = true;
+    /// <summary>Start Snaply (hidden in the tray) when the user signs in to Windows. Off unless the user turns it on.</summary>
+    public bool StartWithWindows { get; set; }
     /// <summary>The user hid the getting-started checklist on Home.</summary>
     public bool OnboardingDismissed { get; set; }
     public GalleryViewMode GalleryViewMode { get; set; } = GalleryViewMode.Grid;
@@ -44,7 +46,7 @@ public sealed class AppSettings
         CopyToClipboardAfterCapture = CopyToClipboardAfterCapture, SaveToLibraryAfterCapture = SaveToLibraryAfterCapture, EditAfterSelection = EditAfterSelection,
         OpenEditorAfterCapture = OpenEditorAfterCapture, DefaultCaptureTool = DefaultCaptureTool, FullScreenTarget = FullScreenTarget,
         CaptureDelaySeconds = CaptureDelaySeconds, ReduceMotion = ReduceMotion,
-        RunInBackground = RunInBackground, OnboardingDismissed = OnboardingDismissed, GalleryViewMode = GalleryViewMode, AutoCheckUpdates = AutoCheckUpdates, LastUpdateCheckUtc = LastUpdateCheckUtc,
+        RunInBackground = RunInBackground, StartWithWindows = StartWithWindows, OnboardingDismissed = OnboardingDismissed, GalleryViewMode = GalleryViewMode, AutoCheckUpdates = AutoCheckUpdates, LastUpdateCheckUtc = LastUpdateCheckUtc,
         OcrLanguages = new List<string>(OcrLanguages), DisabledRedactionTypes = new List<string>(DisabledRedactionTypes), Hotkeys = new Dictionary<string, string>(Hotkeys),
     };
 }

@@ -336,6 +336,12 @@
     </Style.Resources>
   </Style>
 
+  <!-- Choice buttons that show which option is on (overlay style panel) -->
+  <Style Selector="Button.secondary.active /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SelectionBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  </Style>
+
   <!-- Gallery multi-select and keyboard cursor -->
   <Style Selector="Button.tile.focused /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />

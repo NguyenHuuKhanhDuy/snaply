@@ -105,6 +105,7 @@ public partial class EditorPage : UserControl
             FontSize = fontSize,
             FontFamily = new FontFamily("Segoe UI, Inter, sans-serif"),
             Foreground = new SolidColorBrush(color),
+            FontWeight = (req.Existing?.Bold ?? vm.TextBold) ? FontWeight.Bold : FontWeight.Normal,
             Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
             BorderBrush = (IBrush?)Application.Current?.FindResource(ActualThemeVariant, "AccentBrush"),
             BorderThickness = new Thickness(1.5),

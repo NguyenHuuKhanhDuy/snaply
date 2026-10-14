@@ -54,6 +54,11 @@ public sealed class UiFixture : IDisposable
         shell.CanRevealInFolder.Returns(true);
         s.Replace(ServiceDescriptor.Singleton(shell));
 
+        var startup = Substitute.For<IStartupRegistration>();
+        startup.IsSupported.Returns(true);
+        startup.Set(Arg.Any<bool>()).Returns(Snaply.Core.Common.Result.Ok());
+        s.Replace(ServiceDescriptor.Singleton(startup));
+
         var ocr = Substitute.For<IOcrService>();
         ocr.EngineName.Returns("Tesseract");
         ocr.IsAvailable.Returns(true);

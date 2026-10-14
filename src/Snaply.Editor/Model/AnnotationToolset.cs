@@ -1,6 +1,6 @@
 namespace Snaply.Editor.Model;
 
-public enum AnnotationToolKind { Select, Crop, Rectangle, Ellipse, Arrow, Text, Highlight, Step, Redact, Blur, Pixelate }
+public enum AnnotationToolKind { Select, Crop, Rectangle, Ellipse, Line, Arrow, Pen, Text, Highlight, Step, Spotlight, Redact, Blur, Pixelate }
 
 /// <summary>One annotation tool as presented to the user. <paramref name="IconKey"/> names a geometry resource in the app theme.</summary>
 public sealed record AnnotationToolDefinition(AnnotationToolKind Kind, string Name, char Shortcut, string IconKey, string? Hint = null, bool InOverlay = true)
@@ -22,10 +22,13 @@ public static class AnnotationToolset
         new AnnotationToolDefinition(AnnotationToolKind.Crop, "Crop", 'C', "IconCrop", InOverlay: false),
         new AnnotationToolDefinition(AnnotationToolKind.Rectangle, "Rectangle", 'R', "IconSquare"),
         new AnnotationToolDefinition(AnnotationToolKind.Ellipse, "Ellipse", 'O', "IconCircle"),
+        new AnnotationToolDefinition(AnnotationToolKind.Line, "Line", 'L', "IconLine", "hold Shift for 45°"),
         new AnnotationToolDefinition(AnnotationToolKind.Arrow, "Arrow", 'A', "IconArrow", "hold Shift for 45°"),
+        new AnnotationToolDefinition(AnnotationToolKind.Pen, "Pen", 'D', "IconPen"),
         new AnnotationToolDefinition(AnnotationToolKind.Text, "Text", 'T', "IconType"),
         new AnnotationToolDefinition(AnnotationToolKind.Highlight, "Highlight", 'H', "IconHighlight"),
         new AnnotationToolDefinition(AnnotationToolKind.Step, "Numbered step", 'N', "IconStep"),
+        new AnnotationToolDefinition(AnnotationToolKind.Spotlight, "Spotlight", 'S', "IconSpotlight", "dims everything else"),
         new AnnotationToolDefinition(AnnotationToolKind.Redact, "Redact", 'X', "IconRedact", "solid cover for secrets", InOverlay: false),
         new AnnotationToolDefinition(AnnotationToolKind.Blur, "Blur", 'B', "IconBlur", "does not securely hide secrets"),
         new AnnotationToolDefinition(AnnotationToolKind.Pixelate, "Pixelate", 'P', "IconPixelate", "does not securely hide secrets"),

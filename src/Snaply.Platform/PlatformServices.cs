@@ -40,6 +40,7 @@ public static class PlatformServices
             services.AddSingleton<IClipboardService, WindowsClipboardService>();
             services.AddSingleton<IGlobalHotkeyService, WindowsHotkeyService>();
             services.AddSingleton<IShellService, WindowsShellService>();
+            services.AddSingleton<IStartupRegistration, WindowsStartupRegistration>();
         }
         else if (OperatingSystem.IsMacOS())
         {
@@ -48,6 +49,7 @@ public static class PlatformServices
             services.AddSingleton<IGlobalHotkeyService>(_ => new UnsupportedHotkeyService(
                 "Global shortcuts are not implemented on macOS yet. Bind a system keyboard shortcut to run 'snaply --capture-region' instead."));
             services.AddSingleton<IShellService, MacShellService>();
+            services.AddSingleton<IStartupRegistration, UnsupportedStartupRegistration>();
         }
         else
         {
@@ -57,6 +59,7 @@ public static class PlatformServices
                 ? "Wayland does not allow applications to register global shortcuts. Bind a keyboard shortcut in your desktop settings to run 'snaply --capture-region'."
                 : "Global shortcuts are not implemented for X11 yet. Bind a keyboard shortcut in your desktop settings to run 'snaply --capture-region'."));
             services.AddSingleton<IShellService, LinuxShellService>();
+            services.AddSingleton<IStartupRegistration, UnsupportedStartupRegistration>();
         }
         return services;
     }

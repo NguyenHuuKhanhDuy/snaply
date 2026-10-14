@@ -39,6 +39,17 @@ public sealed class AnnotationDtoV1
     public float FontSize { get; set; }
     public int Number { get; set; }
     public float Size { get; set; }
+    /// <summary>Arrow head: 0 end, 1 none, 2 both. Absent in older documents (= end).</summary>
+    public int Head { get; set; }
+    /// <summary>Older documents only have this flag (= Dashed).</summary>
+    public bool Dashed { get; set; }
+    /// <summary>Stroke pattern (see StrokePattern); 0 = solid or not stored.</summary>
+    public int Pattern { get; set; }
+    public bool Bold { get; set; }
+    /// <summary>Text background: 0 none, 1 soft, 2 solid, 3 outline. Absent in older documents (= none).</summary>
+    public int Background { get; set; }
+    /// <summary>Pen stroke samples as x, y pairs.</summary>
+    public List<float>? Points { get; set; }
 }
 
 public enum LoadStatus { Ok, NewerVersion, Corrupt }
@@ -108,11 +119,13 @@ public static class DocumentSerializer
         var d = new AnnotationDtoV1 { Type = a.Kind, Id = a.Id };
         switch (a)
         {
-            case RectangleAnnotation r: d.Rect = ToDto(r.Rect); d.Color = r.Color; d.Stroke = r.StrokeWidth; break;
-            case EllipseAnnotation e: d.Rect = ToDto(e.Rect); d.Color = e.Color; d.Stroke = e.StrokeWidth; break;
-            case ArrowAnnotation ar: d.X1 = ar.Start.X; d.Y1 = ar.Start.Y; d.X2 = ar.End.X; d.Y2 = ar.End.Y; d.Color = ar.Color; d.Stroke = ar.StrokeWidth; break;
+            case RectangleAnnotation r: d.Rect = ToDto(r.Rect); d.Color = r.Color; d.Stroke = r.StrokeWidth; d.Dashed = r.Dashed; d.Pattern = (int)r.Pattern; break;
+            case EllipseAnnotation e: d.Rect = ToDto(e.Rect); d.Color = e.Color; d.Stroke = e.StrokeWidth; d.Dashed = e.Dashed; d.Pattern = (int)e.Pattern; break;
+            case ArrowAnnotation ar: d.X1 = ar.Start.X; d.Y1 = ar.Start.Y; d.X2 = ar.End.X; d.Y2 = ar.End.Y; d.Color = ar.Color; d.Stroke = ar.StrokeWidth; d.Head = (int)ar.Head; d.Dashed = ar.Dashed; d.Pattern = (int)ar.Pattern; break;
+            case PenAnnotation pen: d.Color = pen.Color; d.Stroke = pen.StrokeWidth; d.Dashed = pen.Dashed; d.Pattern = (int)pen.Pattern; d.Points = pen.Points.SelectMany(p => new[] { p.X, p.Y }).ToList(); break;
+            case SpotlightAnnotation sp: d.Rect = ToDto(sp.Rect); d.Size = sp.Dim; break;
             case HighlightAnnotation h: d.Rect = ToDto(h.Rect); d.Color = h.Color; break;
-            case TextAnnotation t: d.X1 = t.Position.X; d.Y1 = t.Position.Y; d.Text = t.Text; d.Color = t.Color; d.FontSize = t.FontSize; break;
+            case TextAnnotation t: d.X1 = t.Position.X; d.Y1 = t.Position.Y; d.Text = t.Text; d.Color = t.Color; d.FontSize = t.FontSize; d.Bold = t.Bold; d.Background = (int)t.Background; break;
             case NumberedStepAnnotation n: d.X1 = n.Center.X; d.Y1 = n.Center.Y; d.Number = n.Number; d.Size = n.Diameter; d.Color = n.Color; d.Stroke = n.StrokeWidth; break;
             case RedactAnnotation red: d.Rect = ToDto(red.Rect); d.Color = red.Color; break;
             case BlurAnnotation bl: d.Rect = ToDto(bl.Rect); d.Size = bl.Radius; break;
@@ -122,6 +135,18 @@ public static class DocumentSerializer
         return d;
     }
 
+    private static StrokePattern ToPattern(AnnotationDtoV1 d) =>
+        d.Pattern != 0 && Enum.IsDefined(typeof(StrokePattern), d.Pattern) ? (StrokePattern)d.Pattern
+        : d.Dashed ? StrokePattern.Dashed : StrokePattern.Solid;
+
+    private static DocPoint[] ToPoints(List<float>? flat)
+    {
+        if (flat is null || flat.Count < 2) return Array.Empty<DocPoint>();
+        var pts = new DocPoint[flat.Count / 2];
+        for (var i = 0; i < pts.Length; i++) pts[i] = new DocPoint(flat[2 * i], flat[2 * i + 1]);
+        return pts;
+    }
+
     /// <summary>Returns null for unknown annotation types so a document with future tools still opens.</summary>
     private static Annotation? FromDto(AnnotationDtoV1 d)
     {
@@ -129,11 +154,13 @@ public static class DocumentSerializer
         var id = d.Id == Guid.Empty ? Guid.NewGuid() : d.Id;
         return d.Type switch
         {
-            "rectangle" => new RectangleAnnotation { Id = id, Rect = rect, Color = d.Color, StrokeWidth = d.Stroke },
-            "ellipse" => new EllipseAnnotation { Id = id, Rect = rect, Color = d.Color, StrokeWidth = d.Stroke },
-            "arrow" => new ArrowAnnotation { Id = id, Start = new(d.X1, d.Y1), End = new(d.X2, d.Y2), Color = d.Color, StrokeWidth = d.Stroke },
+            "rectangle" => new RectangleAnnotation { Id = id, Rect = rect, Color = d.Color, StrokeWidth = d.Stroke, Pattern = ToPattern(d) },
+            "ellipse" => new EllipseAnnotation { Id = id, Rect = rect, Color = d.Color, StrokeWidth = d.Stroke, Pattern = ToPattern(d) },
+            "arrow" => new ArrowAnnotation { Id = id, Start = new(d.X1, d.Y1), End = new(d.X2, d.Y2), Color = d.Color, StrokeWidth = d.Stroke, Head = Enum.IsDefined(typeof(ArrowHead), d.Head) ? (ArrowHead)d.Head : ArrowHead.End, Pattern = ToPattern(d) },
+            "pen" => new PenAnnotation { Id = id, Color = d.Color, StrokeWidth = d.Stroke <= 0 ? 4 : d.Stroke, Pattern = ToPattern(d), Points = ToPoints(d.Points) },
+            "spotlight" => new SpotlightAnnotation { Id = id, Rect = rect, Dim = Math.Clamp(d.Size <= 0 ? SpotlightAnnotation.DefaultDim : d.Size, SpotlightAnnotation.MinDim, SpotlightAnnotation.MaxDim) },
             "highlight" => new HighlightAnnotation { Id = id, Rect = rect, Color = d.Color },
-            "text" => new TextAnnotation { Id = id, Position = new(d.X1, d.Y1), Text = d.Text ?? "", Color = d.Color, FontSize = d.FontSize <= 0 ? 28 : d.FontSize },
+            "text" => new TextAnnotation { Id = id, Position = new(d.X1, d.Y1), Text = d.Text ?? "", Color = d.Color, FontSize = d.FontSize <= 0 ? 28 : d.FontSize, Bold = d.Bold, Background = Enum.IsDefined(typeof(TextBackgroundStyle), d.Background) ? (TextBackgroundStyle)d.Background : TextBackgroundStyle.None },
             "step" => new NumberedStepAnnotation { Id = id, Center = new(d.X1, d.Y1), Number = d.Number, Diameter = d.Size <= 0 ? 40 : d.Size, Color = d.Color, StrokeWidth = d.Stroke },
             "redact" => new RedactAnnotation { Id = id, Rect = rect, Color = (d.Color == 0 ? Colors.RedactFill : d.Color) | 0xFF000000u },
             "blur" => new BlurAnnotation { Id = id, Rect = rect, Radius = d.Size <= 0 ? 12 : d.Size },

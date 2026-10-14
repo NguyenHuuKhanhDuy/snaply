@@ -3,7 +3,8 @@ using System.Text;
 
 namespace Snaply.App.Services;
 
-public enum StartupCommand { Open, CaptureRegion, CaptureFullScreen }
+/// <summary><c>Background</c> = started at sign-in: live in the tray without opening a window.</summary>
+public enum StartupCommand { Open, CaptureRegion, CaptureFullScreen, Background }
 
 public static class StartupCommands
 {
@@ -16,6 +17,7 @@ public static class StartupCommands
                 case "--capture-region": return StartupCommand.CaptureRegion;
                 case "--capture-fullscreen": return StartupCommand.CaptureFullScreen;
                 case "--open": return StartupCommand.Open;
+                case "--background": return StartupCommand.Background;
             }
         }
         return StartupCommand.Open;

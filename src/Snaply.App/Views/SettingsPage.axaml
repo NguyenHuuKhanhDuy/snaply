@@ -75,6 +75,10 @@
             <ToggleSwitch IsChecked="{Binding RunInBackground}" OnContent="" OffContent="" AutomationProperties.Name="Keep running in the background" />
           </c:SettingsRow>
           <Border Classes="divider" />
+          <c:SettingsRow Title="Start when I sign in" Description="{Binding StartupNote}">
+            <ToggleSwitch IsChecked="{Binding StartWithWindows}" IsEnabled="{Binding StartupAvailable}" OnContent="" OffContent="" AutomationProperties.Name="Start Snaply when I sign in" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
           <c:SettingsRow Title="Reduce motion" Description="Turns off sliding and fading animations.">
             <ToggleSwitch IsChecked="{Binding ReduceMotion}" OnContent="" OffContent="" AutomationProperties.Name="Reduce motion" />
           </c:SettingsRow>

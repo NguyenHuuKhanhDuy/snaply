@@ -1,0 +1,58 @@
+# Snaply: guide for agents
+
+Read this first. It maps the codebase so you can open only the files a task needs instead of scanning the source.
+More detail on request: `docs/architecture.md`, `docs/redaction.md`, `docs/releasing.md`, `docs/ui-audit.md`, `README.md` (status table).
+
+## What it is
+Local-first, privacy-first screenshot app (Windows verified; macOS/Linux implemented but unverified). Capture → annotate → OCR → organise → export. C# / .NET 8, Avalonia 11 (MVVM, compiled bindings), CommunityToolkit.Mvvm, EF Core + SQLite, SkiaSharp, Tesseract, Velopack (updates via GitHub Releases). The user writes in Vietnamese; reply in Vietnamese, keep code/identifiers in English. End users must never see technical or third-party names in the UI (no "GitHub", "Tesseract", other apps).
+
+## Projects (src/)
+| Project | Holds |
+|---|---|
+| `Snaply.Core` | No UI/OS code. Models (`Models/AppSettings.cs` = all settings, `Entities.cs`, `Enums.cs`, `Geometry.cs` `PixelRect`, `RawImage.cs`), interfaces (`Interfaces/AppInterfaces.cs`, `PlatformInterfaces.cs`), `Common/Result.cs` (`Result`, `ErrorCode`), `Services/` (`CaptureOrchestrator`, `HotkeyManager`, `OcrWorkflow`, `UpdateCoordinator`, `SettingsValidator`), `Redaction/` (`SensitiveDataDetector`, `SensitiveRules`, `SensitiveTypes`) |
+| `Snaply.Editor` | Non-destructive document: `Model/Annotations.cs` (immutable records), `Commands.cs` (undo/redo, `CommandHistory`), `EditorDocument.cs`, `AnnotationToolset.cs` (single source of tools/shortcuts/palette), `Rendering/DocumentRenderer.cs` (one renderer for preview + every export), `Serialization/DocumentSerializer.cs` (unknown annotation kinds are skipped) |
+| `Snaply.Infrastructure` | `Persistence/` (EF, repo, migrations), `Settings/ApplicationSettingsService.cs` (settings stored per property, reflection), `Storage/` (`ScreenshotLibrary`, `ImageStorageService`, `ThumbnailService`, `ImageCodec`), `AppPaths.cs` |
+| `Snaply.Ocr` | `TesseractOcrService` (line blocks + word boxes) |
+| `Snaply.Platform` | `Windows/` (GDI capture, hotkeys, clipboard, `Native.cs`), `MacOS/`, `Linux/` (CLI-based), `ShellServices.cs` |
+| `Snaply.App` | UI + composition. `AppComposition.cs` (DI, shared with tests), `Program.cs`, `App.axaml.cs`, `Views/`, `ViewModels/`, `Controls/`, `Themes/` (`Tokens.axaml` colours, `Styles.axaml`, `Icons.axaml`), `Services/` |
+
+## Where things live (App)
+- Shell/nav: `ViewModels/MainViewModel.cs` + `Views/MainWindow.axaml` (sidebar, update dot/version, dialogs host, shortcut-record key handling). `Services/NavigationHub.cs`, `AppWindowController.cs` (hide/restore main window, DWM transitions), `SingleInstance.cs`, tray in `App.axaml.cs`.
+- Home: `HomeViewModel` (onboarding checklist, shortcut issues). Settings: `SettingsViewModel` + `SettingsPage.axaml(.cs)` (section nav, search, `SettingsRow`/`SectionCard` controls in `Controls/Controls.cs`; a new section needs: `Sections.Add`, `Keys` array in `SettingsPage.axaml.cs`, a `<Name>Section` card).
+- Gallery: `GalleryViewModel` (day groups, multi-select, bulk actions, keyboard; `ScreenshotItemViewModel`), `GalleryPage.axaml(.cs)`, `Controls/ScreenshotTile`/`ScreenshotRow`, `Services/ScreenshotActions.cs` (delete/export/tag, single and bulk), `DetailsViewModel` + `DetailsPanel`.
+- Editor: `EditorViewModel` (tools, render, copy/export/save, redacted copy), `Views/EditorPage.axaml(.cs)`, `Controls/EditorCanvas.cs` (input, handles, suggestion overlay), `RedactionViewModel` (scan → review → cover), `OcrPanelViewModel`.
+- Capture: `Core/Services/CaptureOrchestrator.cs` (flow: hide window → short wait → grab virtual desktop → overlay → crop → save/copy/editor). Overlay = `Services/RegionSelector.cs` (`RegionOverlayWindow` + `OverlayCanvas`: selection, handles, toolbar, custom crosshair) and `Services/InlineEditSession.cs` (annotations on the frozen frame, `InlineTool`).
+- Start with Windows: setting `StartWithWindows` (default off), `IStartupRegistration` (`Snaply.Platform/StartupRegistration.cs`, HKCU Run value launching `--background`), synced at startup only for installed builds; `--background` starts hidden in the tray (`App.axaml.cs`).
+- Updates: `Services/VelopackUpdateService.cs`, `Core/Services/UpdateCoordinator.cs`, `ViewModels/UpdateBannerViewModel.cs`; release workflow `.github/workflows/release.yml` (pack id `SnaplyApp`, vpk version must equal the Velopack NuGet version).
+
+## Key behaviours / invariants
+- Originals are never modified. Edits are annotations on a document; every output path (copy, export, save-as-new, redacted copy) goes through `DocumentRenderer`.
+- Redaction: `RedactAnnotation` is always opaque, snapped outward to whole pixels. Detection runs only when the user clicks "Find sensitive info", works on the original file, keeps text in memory only (never stored, never logged), and nothing is covered without confirmation. Redacted copy has no OCR text and no annotation document, tag `Redacted`.
+- Annotation kinds: rectangle, ellipse, arrow (also the Line tool: `Head` None/End/Both); every stroked kind (rectangle, ellipse, arrow/line, pen) has `Pattern` (`StrokePattern`: Solid, Dashed, Dotted, DashDot, Pixel, TwoTone; `Dashed` is only a compatibility view), pen (`PenAnnotation`, raw points smoothed at render time), text (`Bold`, `Background` None/Soft/Solid/Outline, colour derived from text colour), highlight, step, spotlight (one combined dim layer drawn under all other annotations), redact, blur, pixelate. New kinds need: record in `Annotations.cs`, `DocumentRenderer`, `DocumentSerializer` (unknown kinds are skipped), `AnnotationToolset`, `EditorTool` + `InlineTool`, icon.
+- Tools/shortcuts/palette: change `AnnotationToolset` only; editor and overlay both build from it (`EditorTool` / `InlineTool` enums must contain every tool they use, a test enforces this).
+- Settings: add a property to `AppSettings` + `Clone()`; it persists automatically. Defaults must work for existing users.
+- Never log recognised text, tokens or file contents. Failures are typed `Result`, never blank images.
+- Thumbnails: `ThumbnailService.Suffix` versions them; bump it when size/quality changes.
+- Windows capture needs per-monitor DPI awareness (`app.manifest`). Overlay is one borderless window over the whole virtual desktop.
+
+## Build, run, test
+```bash
+dotnet build Snaply.sln
+dotnet run --project src/Snaply.App
+dotnet test                                  # ~8 min total; App.Tests dominates
+dotnet test tests/Snaply.App.Tests --filter "Category!=Screenshots"   # ~2 min, skips PNG renders
+SNAPLY_UI_PAGES=settings,gallery dotnet test tests/Snaply.App.Tests --filter "Category=Screenshots"   # renders to artifacts/ui/<state>/<theme>/<size>/<page>.png
+```
+- If the user's IDE/app has the Debug output locked, add `--artifacts-path /tmp/art` (or `-o /tmp/x`).
+- `dotnet test` accepts one project at a time when a path is given.
+- UI tests use Avalonia.Headless (`[AvaloniaFact]`), `tests/Snaply.App.Tests/UiFixture.cs` (real services over a temp DB + synthetic images, NSubstitute fakes for capture/clipboard/hotkeys/shell/OCR/update). Real OCR tests skip themselves when no `eng.traineddata` is installed (`%LOCALAPPDATA%\Snaply\tessdata`).
+- Screenshot states are listed in `tests/Snaply.App.Tests/UiShots.cs`; evidence images in `docs/ui-audit/`.
+
+## Working conventions
+- Spec-driven with OpenSpec: `openspec/changes/<name>/{proposal,design,tasks}.md` + `specs/`. Commands `/opsx:propose`, `/opsx:apply`, `/opsx:archive`. Tick `tasks.md` checkboxes as you finish. Active/finished changes: `build-snaply-app`, `add-auto-update-and-release`, `refresh-ui-ux` (30/31, magnifier deferred), `add-smart-redaction` (23/24, real-OCR manual check pending), `add-spotlight-pen-text-style` (spotlight, pen, line, text style; manual desktop check pending).
+- Match surrounding style; keep changes minimal. Prefer the file tools; in bash, avoid big heredocs with quotes (they break), write files with the Write tool.
+- State honestly what was and was not verified (headless render ≠ real desktop). Platforms other than Windows, tray menu look, multi-monitor mixed DPI and real-OCR redaction accuracy are unverified.
+
+## Open items
+- Redaction manual check with real OCR data (task 6.4); pixel magnifier on overlay (deferred); audit P2: toasts (A-13), banner above editor (A-16), Tags search width (A-17).
+- Installers are unsigned. Updates only work for builds installed by the Velopack installer.

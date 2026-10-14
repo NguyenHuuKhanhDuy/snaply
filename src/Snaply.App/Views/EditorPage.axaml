@@ -3,6 +3,7 @@
              xmlns:vm="using:Snaply.App.ViewModels"
              xmlns:c="using:Snaply.App.Controls"
              xmlns:v="using:Snaply.App.Views"
+             xmlns:em="using:Snaply.Editor.Model"
              x:Class="Snaply.App.Views.EditorPage"
              x:DataType="vm:EditorViewModel"
              Focusable="True">
@@ -10,6 +11,11 @@
     <!-- Narrow windows: icon-only toolbar buttons and a slimmer properties panel so Save never leaves the screen -->
     <Style Selector=":is(UserControl).compact TextBlock.label"><Setter Property="IsVisible" Value="False" /></Style>
     <Style Selector=":is(UserControl).compact Border#PropertiesPanel"><Setter Property="Width" Value="232" /></Style>
+    <Style Selector="Button.choice, ToggleButton.choice"><Setter Property="Padding" Value="10,4" /><Setter Property="MinHeight" Value="30" /></Style>
+    <Style Selector="Button.choice.active /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.choice:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource SelectionBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
     <Style Selector="Button.picked /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
     </Style>
@@ -178,6 +184,43 @@
                 <TextBlock Grid.Column="1" Text="{Binding StrokeWidth, StringFormat={}{0:0}}" Classes="caption secondary" />
               </Grid>
               <Slider Minimum="1" Maximum="16" Value="{Binding StrokeWidth}" TickFrequency="1" IsSnapToTickEnabled="True" AutomationProperties.Name="Stroke width" />
+            </StackPanel>
+
+            <StackPanel Spacing="8" IsVisible="{Binding ShowTextStyle}">
+              <TextBlock Text="Text style" Classes="sectionLabel" />
+              <ToggleButton Classes="secondary choice" IsChecked="{Binding TextBold}" HorizontalAlignment="Left" AutomationProperties.Name="Bold">
+                <TextBlock Text="Bold" FontWeight="Bold" />
+              </ToggleButton>
+              <TextBlock Text="Background" Classes="caption secondary" />
+              <WrapPanel>
+                <Button Classes="secondary choice" Classes.active="{Binding IsBgNone}" Content="None" Margin="0,0,6,6" Command="{Binding SetTextBackgroundCommand}" CommandParameter="{x:Static em:TextBackgroundStyle.None}" />
+                <Button Classes="secondary choice" Classes.active="{Binding IsBgSoft}" Content="Soft" Margin="0,0,6,6" Command="{Binding SetTextBackgroundCommand}" CommandParameter="{x:Static em:TextBackgroundStyle.Soft}" />
+                <Button Classes="secondary choice" Classes.active="{Binding IsBgSolid}" Content="Solid" Margin="0,0,6,6" Command="{Binding SetTextBackgroundCommand}" CommandParameter="{x:Static em:TextBackgroundStyle.Solid}" />
+                <Button Classes="secondary choice" Classes.active="{Binding IsBgOutline}" Content="Outline" Margin="0,0,6,6" Command="{Binding SetTextBackgroundCommand}" CommandParameter="{x:Static em:TextBackgroundStyle.Outline}" />
+              </WrapPanel>
+            </StackPanel>
+
+            <StackPanel Spacing="8" IsVisible="{Binding ShowLineStyle}">
+              <TextBlock Text="Line style" Classes="sectionLabel" />
+              <TextBlock Text="Pattern" Classes="caption secondary" />
+              <ComboBox ItemsSource="{Binding PatternNames}" SelectedIndex="{Binding PatternIndex}" HorizontalAlignment="Stretch" AutomationProperties.Name="Line pattern" />
+              <StackPanel Spacing="6" IsVisible="{Binding ShowArrowHead}">
+                <TextBlock Text="Arrow head" Classes="caption secondary" />
+                <WrapPanel>
+                  <Button Classes="secondary choice" Classes.active="{Binding IsHeadNone}" Content="None" Margin="0,0,6,6" Command="{Binding SetArrowHeadCommand}" CommandParameter="{x:Static em:ArrowHead.None}" />
+                  <Button Classes="secondary choice" Classes.active="{Binding IsHeadEnd}" Content="End" Margin="0,0,6,6" Command="{Binding SetArrowHeadCommand}" CommandParameter="{x:Static em:ArrowHead.End}" />
+                  <Button Classes="secondary choice" Classes.active="{Binding IsHeadBoth}" Content="Both" Margin="0,0,6,6" Command="{Binding SetArrowHeadCommand}" CommandParameter="{x:Static em:ArrowHead.Both}" />
+                </WrapPanel>
+              </StackPanel>
+            </StackPanel>
+
+            <StackPanel Spacing="8" IsVisible="{Binding ShowSpotlight}">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="Spotlight dimming" Classes="sectionLabel" />
+                <TextBlock Grid.Column="1" Text="{Binding SpotlightPercent, StringFormat={}{0:0}%}" Classes="caption secondary" />
+              </Grid>
+              <Slider Minimum="10" Maximum="90" Value="{Binding SpotlightPercent}" TickFrequency="5" IsSnapToTickEnabled="True" AutomationProperties.Name="Spotlight dimming" />
+              <TextBlock Classes="caption secondary" TextWrapping="Wrap" Text="Everything outside the chosen areas is dimmed. Other annotations stay fully visible." />
             </StackPanel>
 
             <StackPanel Spacing="8" IsVisible="{Binding HasCrop}">

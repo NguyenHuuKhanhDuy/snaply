@@ -361,7 +361,8 @@ public sealed class EditorCanvas : Control
                 if (_previewStarted)
                 {
                     var live = Editor.FindAnnotation(_tempId);
-                    if (live is not null && Distance(_dragStart, _dragCurrent) >= MinDrawSize) Editor.CommitNew(live);
+                    // A pen stroke may end where it began (circling something), so only the other tools need a minimum drag distance.
+                    if (live is not null && (Editor.Tool == EditorTool.Pen || Distance(_dragStart, _dragCurrent) >= MinDrawSize)) Editor.CommitNew(live);
                     else Editor.AbandonNewPreview(_tempId);
                 }
                 break;
@@ -392,9 +393,9 @@ public sealed class EditorCanvas : Control
 
     private DocPoint Constrain(DocPoint a, DocPoint b, bool shift)
     {
-        if (!shift || Editor is null) return b;
+        if (!shift || Editor is null || Editor.Tool == EditorTool.Pen) return b;
         var dx = b.X - a.X; var dy = b.Y - a.Y;
-        if (Editor.Tool == EditorTool.Arrow)
+        if (Editor.Tool is EditorTool.Arrow or EditorTool.Line)
         {
             var angle = Math.Round(Math.Atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
             var len = (float)Math.Sqrt(dx * dx + dy * dy);

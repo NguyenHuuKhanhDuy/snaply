@@ -69,6 +69,9 @@ public abstract record StyledAnnotation : Annotation
 public sealed record RectangleAnnotation : StyledAnnotation
 {
     public DocRect Rect { get; init; }
+    public StrokePattern Pattern { get; init; }
+    /// <summary>Compatibility view of <see cref="Pattern"/>: true for any non-solid pattern; setting it picks Dashed or Solid.</summary>
+    public bool Dashed { get => Pattern != StrokePattern.Solid; init => Pattern = value ? StrokePattern.Dashed : StrokePattern.Solid; }
     public override string Kind => "rectangle";
     public override DocRect Bounds => Rect;
     public override Annotation Translated(float dx, float dy) => this with { Rect = Rect.Translate(dx, dy) };
@@ -87,6 +90,9 @@ public sealed record RectangleAnnotation : StyledAnnotation
 public sealed record EllipseAnnotation : StyledAnnotation
 {
     public DocRect Rect { get; init; }
+    public StrokePattern Pattern { get; init; }
+    /// <summary>Compatibility view of <see cref="Pattern"/>: true for any non-solid pattern; setting it picks Dashed or Solid.</summary>
+    public bool Dashed { get => Pattern != StrokePattern.Solid; init => Pattern = value ? StrokePattern.Dashed : StrokePattern.Solid; }
     public override string Kind => "ellipse";
     public override DocRect Bounds => Rect;
     public override Annotation Translated(float dx, float dy) => this with { Rect = Rect.Translate(dx, dy) };
@@ -104,10 +110,36 @@ public sealed record EllipseAnnotation : StyledAnnotation
     }
 }
 
+/// <summary>How a stroke is drawn: solid, or one of several dash patterns. Two-tone alternates white and black so it reads on any background.</summary>
+public enum StrokePattern { Solid = 0, Dashed = 1, Dotted = 2, DashDot = 3, Pixel = 4, TwoTone = 5 }
+
+public static class StrokePatterns
+{
+    public static readonly IReadOnlyList<StrokePattern> All = Enum.GetValues<StrokePattern>();
+
+    public static string Label(StrokePattern p) => p switch
+    {
+        StrokePattern.Solid => "Solid",
+        StrokePattern.Dashed => "Dashed",
+        StrokePattern.Dotted => "Dotted",
+        StrokePattern.DashDot => "Dash-dot",
+        StrokePattern.Pixel => "Pixel 1-1",
+        StrokePattern.TwoTone => "Two-tone",
+        _ => p.ToString(),
+    };
+}
+
+public enum ArrowHead { End = 0, None = 1, Both = 2 }
+
+/// <summary>An arrow or, with <see cref="Head"/> = None, a plain straight line. One kind so selection, moving and styling work the same for both.</summary>
 public sealed record ArrowAnnotation : StyledAnnotation
 {
     public DocPoint Start { get; init; }
     public DocPoint End { get; init; }
+    public ArrowHead Head { get; init; } = ArrowHead.End;
+    public StrokePattern Pattern { get; init; }
+    /// <summary>Compatibility view of <see cref="Pattern"/>: true for any non-solid pattern; setting it picks Dashed or Solid.</summary>
+    public bool Dashed { get => Pattern != StrokePattern.Solid; init => Pattern = value ? StrokePattern.Dashed : StrokePattern.Solid; }
     public override string Kind => "arrow";
     public override DocRect Bounds => DocRect.FromPoints(Start, End);
 
@@ -148,12 +180,17 @@ public sealed record HighlightAnnotation : Annotation
     public override Annotation Resized(DocRect bounds) => this with { Rect = bounds };
 }
 
+public enum TextBackgroundStyle { None = 0, Soft = 1, Solid = 2, Outline = 3 }
+
 public sealed record TextAnnotation : Annotation
 {
     public DocPoint Position { get; init; }
     public string Text { get; init; } = "";
     public uint Color { get; init; } = Colors.Red;
     public float FontSize { get; init; } = 28;
+    public bool Bold { get; init; }
+    /// <summary>Backing or outline behind the letters. Its colour is derived from the text colour so the text always contrasts.</summary>
+    public TextBackgroundStyle Background { get; init; }
     public override string Kind => "text";
     public const float MinFontSize = 8, MaxFontSize = 400;
 
@@ -161,7 +198,7 @@ public sealed record TextAnnotation : Annotation
     {
         get
         {
-            var (w, h) = TextMetrics.Measure(Text, FontSize);
+            var (w, h) = TextMetrics.Measure(Text, FontSize, Bold);
             return new DocRect(Position.X, Position.Y, w, h);
         }
     }
@@ -192,6 +229,83 @@ public sealed record NumberedStepAnnotation : StyledAnnotation
     public override Annotation Resized(DocRect bounds) =>
         this with { Center = new(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2), Diameter = Math.Max(16, Math.Max(bounds.Width, bounds.Height)) };
     public override StyledAnnotation WithStyle(uint color, float strokeWidth) => this with { Color = color, StrokeWidth = strokeWidth };
+}
+
+/// <summary>
+/// Dims everything outside <see cref="Rect"/>. All spotlights of a document form one dim layer drawn beneath the other annotations
+/// (see DocumentRenderer), so several spotlights never darken each other's areas.
+/// </summary>
+public sealed record SpotlightAnnotation : Annotation
+{
+    public const float MinDim = 0.1f, MaxDim = 0.9f, DefaultDim = 0.6f;
+
+    public DocRect Rect { get; init; }
+    public float Dim { get; init; } = DefaultDim;
+    public override string Kind => "spotlight";
+    public override DocRect Bounds => Rect;
+    public override Annotation Translated(float dx, float dy) => this with { Rect = Rect.Translate(dx, dy) };
+    public override Annotation Resized(DocRect bounds) => this with { Rect = bounds };
+
+    /// <summary>Only the edge band hits, so annotations drawn inside the bright area stay selectable.</summary>
+    public override bool HitTest(DocPoint p, float tolerance)
+    {
+        var band = tolerance + 4;
+        var outer = Rect.Inflate(band);
+        if (!outer.Contains(p)) return false;
+        var inner = Rect.Inflate(-band);
+        return inner.Width <= 0 || inner.Height <= 0 || !inner.Contains(p);
+    }
+}
+
+/// <summary>A freehand stroke. The stored points are the raw samples; smoothing happens when drawing.</summary>
+public sealed record PenAnnotation : StyledAnnotation
+{
+    public DocPoint[] Points { get; init; } = Array.Empty<DocPoint>();
+    public StrokePattern Pattern { get; init; }
+    /// <summary>Compatibility view of <see cref="Pattern"/>: true for any non-solid pattern; setting it picks Dashed or Solid.</summary>
+    public bool Dashed { get => Pattern != StrokePattern.Solid; init => Pattern = value ? StrokePattern.Dashed : StrokePattern.Solid; }
+    public override string Kind => "pen";
+
+    public override DocRect Bounds
+    {
+        get
+        {
+            if (Points.Length == 0) return default;
+            float l = Points[0].X, t = Points[0].Y, r = l, b = t;
+            foreach (var p in Points) { l = Math.Min(l, p.X); t = Math.Min(t, p.Y); r = Math.Max(r, p.X); b = Math.Max(b, p.Y); }
+            return new DocRect(l, t, r - l, b - t);
+        }
+    }
+
+    public override Annotation Translated(float dx, float dy) => this with { Points = Points.Select(p => new DocPoint(p.X + dx, p.Y + dy)).ToArray() };
+
+    public override Annotation Resized(DocRect bounds)
+    {
+        var old = Bounds;
+        float Map(float v, float o0, float oLen, float n0, float nLen) => oLen <= 0 ? n0 + nLen / 2 : n0 + (v - o0) / oLen * nLen;
+        return this with { Points = Points.Select(p => new DocPoint(Map(p.X, old.X, old.Width, bounds.X, bounds.Width), Map(p.Y, old.Y, old.Height, bounds.Y, bounds.Height))).ToArray() };
+    }
+
+    public override StyledAnnotation WithStyle(uint color, float strokeWidth) => this with { Color = color, StrokeWidth = strokeWidth };
+
+    public override bool HitTest(DocPoint p, float tolerance)
+    {
+        var reach = tolerance + Math.Max(StrokeWidth, 6) / 2;
+        if (Points.Length == 1) return Dist(p, Points[0]) <= reach;
+        for (var i = 1; i < Points.Length; i++)
+            if (SegmentDistance(p, Points[i - 1], Points[i]) <= reach) return true;
+        return false;
+    }
+
+    private static double Dist(DocPoint a, DocPoint b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+
+    private static double SegmentDistance(DocPoint p, DocPoint a, DocPoint b)
+    {
+        var dx = b.X - a.X; var dy = b.Y - a.Y;
+        var len2 = dx * dx + dy * dy;
+        var t = len2 <= 0 ? 0 : Math.Clamp(((p.X - a.X) * dx + (p.Y - a.Y) * dy) / len2, 0, 1);
+        return Dist(p, new DocPoint((float)(a.X + t * dx), (float)(a.Y + t * dy)));
+    }
 }
 
 /// <summary>Obscures the underlying pixels. Shared base so the renderer and tools treat blur and pixelate uniformly.</summary>
@@ -231,9 +345,10 @@ public sealed record PixelateAnnotation : RedactionAnnotation
 
 internal static class TextMetrics
 {
-    public static (float Width, float Height) Measure(string text, float fontSize)
+    public static (float Width, float Height) Measure(string text, float fontSize, bool bold = false)
     {
-        using var font = new SKFont(SKTypeface.Default, fontSize);
+        using var face = bold ? SKTypeface.FromFamilyName(null, SKFontStyle.Bold) : null;
+        using var font = new SKFont(face ?? SKTypeface.Default, fontSize);
         using var paint = new SKPaint(font);
         var lines = (text ?? "").Split('\n');
         var lineHeight = font.Spacing;

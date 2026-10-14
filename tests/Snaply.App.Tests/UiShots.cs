@@ -67,6 +67,39 @@ public class UiShots
                 await Settle(800);
                 if (m.CurrentPage is GalleryViewModel g) await g.SetViewModeCommand.ExecuteAsync(Snaply.Core.Models.GalleryViewMode.List);
             });
+            yield return new("editor-annotations", null, async (fx, m) =>
+            {
+                await m.OpenEditorAsync(fx.ScreenshotIds[1]);
+                if (m.CurrentPage is not EditorViewModel e) return;
+                var h = e.History!;
+                h.Execute(new Snaply.Editor.Model.AddAnnotationCommand(new Snaply.Editor.Model.SpotlightAnnotation { Rect = new Snaply.Editor.Model.DocRect(330, 300, 760, 330), Dim = 0.65f }));
+                h.Execute(new Snaply.Editor.Model.AddAnnotationCommand(new Snaply.Editor.Model.ArrowAnnotation { Start = new(1300, 260), End = new(1000, 420), Color = 0xFFE5484D, StrokeWidth = 7, Head = Snaply.Editor.Model.ArrowHead.Both, Dashed = true }));
+                h.Execute(new Snaply.Editor.Model.AddAnnotationCommand(new Snaply.Editor.Model.PenAnnotation
+                {
+                    Color = 0xFFFFD60A, StrokeWidth = 8,
+                    Points = Enumerable.Range(0, 60).Select(i => new Snaply.Editor.Model.DocPoint(420 + i * 9, 360 + (float)Math.Sin(i / 5.0) * 26)).ToArray(),
+                }));
+                var text = new Snaply.Editor.Model.TextAnnotation { Position = new(420, 470), Text = "Check this setting", FontSize = 46, Color = 0xFFFFFFFF, Bold = true, Background = Snaply.Editor.Model.TextBackgroundStyle.Solid };
+                h.Execute(new Snaply.Editor.Model.AddAnnotationCommand(text));
+                e.Select(text.Id);
+            });
+            yield return new("editor-patterns", null, async (fx, m) =>
+            {
+                await m.OpenEditorAsync(fx.ScreenshotIds[1]);
+                if (m.CurrentPage is not EditorViewModel e) return;
+                var h = e.History!;
+                var y = 140f;
+                foreach (var pattern in Snaply.Editor.Model.StrokePatterns.All)
+                {
+                    h.Execute(new Snaply.Editor.Model.AddAnnotationCommand(new Snaply.Editor.Model.ArrowAnnotation { Start = new(200, y), End = new(1500, y), Color = 0xFFE5484D, StrokeWidth = 5, Head = Snaply.Editor.Model.ArrowHead.None, Pattern = pattern }));
+                    y += 70;
+                }
+                var rect = new Snaply.Editor.Model.RectangleAnnotation { Rect = new(300, 600, 500, 300), Color = 0xFF3B82F6, StrokeWidth = 5, Pattern = Snaply.Editor.Model.StrokePattern.DashDot };
+                h.Execute(new Snaply.Editor.Model.AddAnnotationCommand(rect));
+                h.Execute(new Snaply.Editor.Model.AddAnnotationCommand(new Snaply.Editor.Model.EllipseAnnotation { Rect = new(900, 600, 500, 300), Color = 0xFF111111, StrokeWidth = 5, Pattern = Snaply.Editor.Model.StrokePattern.TwoTone }));
+                e.Tool = EditorTool.Select;
+                e.Select(rect.Id);
+            });
             yield return new("editor-redaction", null, async (fx, m) =>
             {
                 var ocr = fx.Services.GetRequiredService<Snaply.Core.Interfaces.IOcrService>();

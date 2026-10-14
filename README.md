@@ -11,12 +11,13 @@ Verified = built and exercised on that OS. Only **Windows 11** has been run so f
 |---|---|---|---|
 | App shell, navigation, Light/Dark/System themes | Verified | Unverified | Unverified |
 | History (SQLite, thumbnails, search, favorites, tags) | Verified (automated tests + manual) | Unverified | Unverified |
-| Image editor (crop, rectangle, ellipse, arrow, text, highlight, steps, blur, pixelate, undo/redo, export, copy, save-as-new) | Manual smoke check of capture → editor → arrow; unit tests for model/renderer | Unverified | Unverified |
+| Image editor (crop, rectangle, ellipse, line, arrow with optional heads and dashes, freehand pen, text with bold/background/outline, highlight, steps, spotlight, solid redact, blur, pixelate, undo/redo, export, copy, save-as-new) | Manual smoke check of capture → editor → arrow; unit tests for model/renderer | Unverified | Unverified |
 | Full-screen / region capture, overlay | Verified for single monitor | Implemented, unverified (`screencapture`, needs Screen Recording permission) | Implemented, unverified (maim/scrot/import on X11; grim/gnome-screenshot/spectacle on Wayland) |
 | Multi-monitor, mixed DPI | Implemented, **not verified** | Implemented, unverified | X11 via xrandr, unverified |
 | Global shortcuts | Implemented (`RegisterHotKey`), not individually verified | **Not implemented** (explained in UI; use `snaply --capture-region` bound in System Settings) | **Not implemented** (X11 planned; Wayland forbids it) |
 | Clipboard (image/text) | Implemented | Implemented, unverified (pbcopy/osascript) | Implemented, unverified (xclip / wl-copy) |
 | OCR (Tesseract, local) | Engine integrated; recognition needs `eng.traineddata` (see below) | Unverified | Unverified |
+| Start when you sign in (Settings, off by default; installed app only; starts hidden in the tray) | Implemented (HKCU Run entry, `--background`); registry logic tested, a real sign-in not yet checked | Not implemented | Not implemented |
 | System tray (run in background) | Implemented; closing the window keeps the process alive (checked); tray menu not checked by eye | Unverified | Unverified (needs a tray-capable desktop) |
 | Smart redaction (find and cover emails, phone numbers, IPs, keys, tokens, JWTs, cards) | Implemented; rules and pixel output covered by automated tests; **not yet checked against real OCR output on a desktop** (see [docs/redaction.md](docs/redaction.md)) | Unverified | Unverified |
 | Window capture (P1) | Not implemented | — | — |

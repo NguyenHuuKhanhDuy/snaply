@@ -71,6 +71,14 @@ internal sealed class RegionOverlayWindow : Window
     private readonly List<Control> _toolControls = new();
     private readonly List<(uint Color, Button Button)> _colorButtons = new();
     private readonly List<(float Width, Button Button)> _widthButtons = new();
+    // Style toggles live on the window so they carry over when the selection is redone.
+    private bool _styleBold;
+    private StrokePattern _stylePattern;
+    private ArrowHead _styleHead = ArrowHead.End;
+    private double _styleDimPercent = SpotlightAnnotation.DefaultDim * 100;
+    private readonly List<(Button Button, Func<bool> IsOn)> _styleChoices = new();
+    private TextBackgroundStyle _styleTextBg;
+    private Button? _styleButton, _boldButton;
     private Button? _undoButton, _redoButton;
     private TextBox? _textBox;
     private bool _drawing;
@@ -431,6 +439,8 @@ internal sealed class RegionOverlayWindow : Window
         _session = new InlineEditSession(_frame, px);
         _session.Changed += () => _canvas.InvalidateVisual();
         _session.Tool = InlineEditSession.ToolFor(_options.DefaultTool);
+        _session.Pattern = _stylePattern; _session.Bold = _styleBold; _session.TextBackground = _styleTextBg;
+        _session.ArrowHeadStyle = _styleHead; _session.SpotlightDim = (float)(_styleDimPercent / 100);
         _phase = Phase.Editing;
         _canvas.SetSelection(selDip.TopLeft, selDip.BottomRight);
         _canvas.SetSession(_session);
@@ -487,6 +497,7 @@ internal sealed class RegionOverlayWindow : Window
             AcceptsReturn = true, MinWidth = 120, MinHeight = 0, Padding = new Thickness(2),
             FontSize = Math.Max(10, (existing?.FontSize ?? s.TextSize) * k), FontFamily = new FontFamily("Segoe UI, Inter, sans-serif"),
             Foreground = new SolidColorBrush(Color.FromUInt32(existing?.Color ?? s.Color)),
+            FontWeight = (existing?.Bold ?? s.Bold) ? FontWeight.Bold : FontWeight.Normal,
             Background = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255)),
             BorderThickness = new Thickness(1.5), BorderBrush = Res<IBrush>("AccentBrush") ?? Brushes.DodgerBlue,
             Watermark = "Type text", Tag = new TextEdit(doc, existing), Text = existing?.Text ?? "",
@@ -678,7 +689,7 @@ internal sealed class RegionOverlayWindow : Window
                 },
             };
             var c = color;
-            swatch.Click += (_, _) => { _session!.Color = c; _session.RestyleSelected(); UpdateToolSelection(); UpdateUndoRedo(); Focus(); };
+            swatch.Click += (_, _) => { _session!.Color = c; _session.RestyleSelected(InlineEditSession.RestyleScope.ColorStroke); UpdateToolSelection(); UpdateUndoRedo(); Focus(); };
             Avalonia.Automation.AutomationProperties.SetName(swatch, "Annotation color");
             _colorButtons.Add((color, swatch));
             options.Children.Add(swatch);
@@ -693,10 +704,16 @@ internal sealed class RegionOverlayWindow : Window
             ToolTip.SetTip(b, tip + " stroke");
             Avalonia.Automation.AutomationProperties.SetName(b, tip + " stroke");
             var width = w;
-            b.Click += (_, _) => { _session!.Stroke = width; _session.RestyleSelected(); UpdateToolSelection(); UpdateUndoRedo(); Focus(); };
+            b.Click += (_, _) => { _session!.Stroke = width; _session.RestyleSelected(InlineEditSession.RestyleScope.ColorStroke); UpdateToolSelection(); UpdateUndoRedo(); Focus(); };
             _widthButtons.Add((w, b));
             options.Children.Add(b);
         }
+        options.Children.Add(HSeparator());
+
+        // Bold is a quick toggle; everything else about line and text style is chosen directly in the Style panel.
+        _boldButton = MakeIconButton("IconBold", "Bold text", () => { _styleBold = !_styleBold; ApplyStyle(InlineEditSession.RestyleScope.Text); });
+        _styleButton = BuildStyleButton();
+        options.Children.Add(_boldButton); options.Children.Add(_styleButton);
         options.Children.Add(HSeparator());
 
         options.Children.Add(MakeIconButton("IconCopy", "Copy to clipboard (Ctrl+C)", () => CompleteEditing(SelectionAction.Copy)));
@@ -790,6 +807,64 @@ internal sealed class RegionOverlayWindow : Window
         foreach (var (tool, b) in _toolButtons) b.Classes.Set("active", _session.Tool == tool);
         foreach (var (c, b) in _colorButtons) b.BorderBrush = c == _session.Color ? Res<IBrush>("AccentBrush") ?? Brushes.DodgerBlue : Brushes.Transparent;
         foreach (var (w, b) in _widthButtons) b.Classes.Set("active", Math.Abs(w - _session.Stroke) < 0.1f);
+        _boldButton?.Classes.Set("active", _styleBold);
+        foreach (var (button, isOn) in _styleChoices) button.Classes.Set("active", isOn());
+        _styleButton?.Classes.Set("active", _stylePattern != StrokePattern.Solid || _styleTextBg != TextBackgroundStyle.None || _styleHead != ArrowHead.End);
+    }
+
+    private void ApplyStyle(InlineEditSession.RestyleScope scope)
+    {
+        if (_session is null) return;
+        _session.Pattern = _stylePattern; _session.Bold = _styleBold; _session.TextBackground = _styleTextBg;
+        _session.ArrowHeadStyle = _styleHead; _session.SpotlightDim = (float)(_styleDimPercent / 100);
+        _session.RestyleSelected(scope);
+        UpdateToolSelection();
+        UpdateUndoRedo();
+    }
+
+    /// <summary>The Style button opens a small panel for choosing line pattern, arrow head, text background and spotlight strength directly.</summary>
+    private Button BuildStyleButton()
+    {
+        var panel = new StackPanel { Spacing = 8, Width = 270 };
+        var caption = Res<IBrush>("TextSecondaryBrush");
+
+        void Group<T>(string title, IEnumerable<T> values, Func<T, string> label, Func<T> current, Action<T> set, InlineEditSession.RestyleScope scope)
+        {
+            panel.Children.Add(new TextBlock { Text = title, FontSize = 12, FontWeight = FontWeight.Medium, Foreground = caption });
+            var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
+            foreach (var v in values)
+            {
+                var value = v;
+                var b = new Button { Content = label(v), Classes = { "secondary" }, Padding = new Thickness(10, 3), MinHeight = 28, Margin = new Thickness(0, 0, 6, 6) };
+                b.Click += (_, _) => { set(value); ApplyStyle(scope); };
+                _styleChoices.Add((b, () => EqualityComparer<T>.Default.Equals(current(), value)));
+                wrap.Children.Add(b);
+            }
+            panel.Children.Add(wrap);
+        }
+
+        Group("Line style", StrokePatterns.All, StrokePatterns.Label, () => _stylePattern, v => _stylePattern = v, InlineEditSession.RestyleScope.Pattern);
+        Group("Arrow head", new[] { ArrowHead.None, ArrowHead.End, ArrowHead.Both }, v => v == ArrowHead.None ? "None" : v.ToString(), () => _styleHead, v => _styleHead = v, InlineEditSession.RestyleScope.Head);
+        Group("Text background", new[] { TextBackgroundStyle.None, TextBackgroundStyle.Soft, TextBackgroundStyle.Solid, TextBackgroundStyle.Outline }, v => v.ToString(), () => _styleTextBg, v => _styleTextBg = v, InlineEditSession.RestyleScope.Text);
+
+        panel.Children.Add(new TextBlock { Text = "Spotlight dimming", FontSize = 12, FontWeight = FontWeight.Medium, Foreground = caption });
+        var slider = new Slider { Minimum = 10, Maximum = 90, Value = _styleDimPercent, TickFrequency = 5, IsSnapToTickEnabled = true };
+        Avalonia.Automation.AutomationProperties.SetName(slider, "Spotlight dimming");
+        slider.PropertyChanged += (_, e) =>
+        {
+            if (e.Property != Slider.ValueProperty) return;
+            _styleDimPercent = slider.Value;
+            ApplyStyle(InlineEditSession.RestyleScope.Dim);
+        };
+        panel.Children.Add(slider);
+
+        var flyout = new Flyout { Content = panel, Placement = PlacementMode.Top };
+        flyout.Closed += (_, _) => Focus();
+        var button = new Button { Classes = { "icon" }, Content = new Icon { Data = Res<Geometry>("IconStyle"), Size = 18 }, Width = 32, Height = 32 };
+        ToolTip.SetTip(button, "Style: line pattern, arrow head, text background, spotlight");
+        Avalonia.Automation.AutomationProperties.SetName(button, "Style options");
+        button.Click += (_, _) => { UpdateToolSelection(); flyout.ShowAt(button); };
+        return button;
     }
 
     private void UpdateUndoRedo()

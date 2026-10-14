@@ -102,8 +102,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     public SettingsViewModel(IApplicationSettingsService settings, ThemeService theme, DialogService dialogs, INotificationService notes,
         HotkeyManager hotkeys, IScreenshotLibrary library, IScreenshotRepository repo, IOcrService ocr, IScreenCaptureService capture,
-        IShellService shell, AppPaths paths, LibraryEvents events, UpdateBannerViewModel updates)
+        IShellService shell, AppPaths paths, LibraryEvents events, UpdateBannerViewModel updates, IStartupRegistration startup)
     {
+        _startup = startup;
         _settings = settings; _theme = theme; _dialogs = dialogs; _notes = notes; _hotkeys = hotkeys; _library = library; _repo = repo;
         _ocr = ocr; _capture = capture; _shell = shell; _paths = paths; _events = events;
         Updates = updates;
@@ -169,6 +170,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _reduceMotion;
     [ObservableProperty] private bool _autoCheckUpdates;
     [ObservableProperty] private bool _runInBackground;
+    [ObservableProperty] private bool _startWithWindows;
 
     // Capture
     [ObservableProperty] private string _saveDirectory = "";
@@ -213,6 +215,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string? _verifyResult;
     [ObservableProperty] private bool _isBusy;
     private LibraryVerification? _lastVerification;
+    private readonly IStartupRegistration _startup;
     [ObservableProperty] private bool _canRemoveOrphans;
 
     // About
@@ -239,6 +242,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             ReduceMotion = s.ReduceMotion;
             AutoCheckUpdates = s.AutoCheckUpdates;
             RunInBackground = s.RunInBackground;
+            StartWithWindows = s.StartWithWindows;
             SaveDirectory = _settings.EffectiveSaveDirectory;
             UsesDefaultDirectory = string.IsNullOrWhiteSpace(s.SaveDirectory);
             FormatIndex = s.DefaultFormat == ImageFormat.Jpeg ? 1 : 0;
@@ -298,6 +302,25 @@ public sealed partial class SettingsViewModel : ViewModelBase
     }
 
     partial void OnRunInBackgroundChanged(bool value) => _ = ApplyAsync(s => s.RunInBackground = value);
+
+    /// <summary>Starting with Windows is offered only where it works: Windows, and the installed app (not a development build).</summary>
+    public bool StartupAvailable => _startup.IsSupported && Updates.IsSupported;
+    public string StartupNote => !_startup.IsSupported ? "Available on Windows only."
+        : !Updates.IsSupported ? "Available in the installed app, not in development builds."
+        : "Snaply starts hidden in the system tray when you sign in, so your shortcuts work right away.";
+
+    partial void OnStartWithWindowsChanged(bool value)
+    {
+        if (_loading || !StartupAvailable) return;
+        var result = _startup.Set(value);
+        if (!result.IsSuccess)
+        {
+            _notes.Show(NotificationKind.Warning, "Could not change the startup setting", result.Error!.Message);
+            _loading = true; StartWithWindows = !value; _loading = false; // put the switch back
+            return;
+        }
+        _ = ApplyAsync(s => s.StartWithWindows = value);
+    }
 
     partial void OnAutoCheckUpdatesChanged(bool value) => _ = ApplyAsync(s => s.AutoCheckUpdates = value);
 

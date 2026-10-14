@@ -54,10 +54,21 @@ public partial class App : Application
             theme.ApplyMotion(settings.Current.ReduceMotion);
 
             var main = _services.GetRequiredService<MainViewModel>();
+            SyncStartupRegistration(settings.Current);
+
             var window = new MainWindow { DataContext = main };
             desktop.MainWindow = window;
             SetupBackgroundMode(desktop, window);
-            window.Opened += async (_, _) => await OnWindowOpenedAsync(main);
+
+            // Started at sign-in: the window is created invisible and hidden as soon as it exists, so nothing flashes on screen.
+            // Without a tray there would be no way back to a hidden window, so then it opens normally.
+            var startHidden = Program.InitialCommand == StartupCommand.Background && settings.Current.RunInBackground && _trayAvailable;
+            if (startHidden) { window.Opacity = 0; window.ShowInTaskbar = false; }
+            window.Opened += async (_, _) =>
+            {
+                if (startHidden) { window.Hide(); window.Opacity = 1; window.ShowInTaskbar = true; }
+                await OnWindowOpenedAsync(main);
+            };
             desktop.ShutdownRequested += (_, _) => Shutdown();
             desktop.Exit += (_, _) => (_services as IDisposable)?.Dispose();
 
@@ -175,7 +186,22 @@ public partial class App : Application
         StartHotkeys();
         StartUpdateChecks(main);
         Program.Instance?.Listen(cmd => Dispatcher.UIThread.Post(() => _ = RunCommandAsync(cmd)));
-        if (Program.InitialCommand != StartupCommand.Open) await RunCommandAsync(Program.InitialCommand);
+        if (Program.InitialCommand is not (StartupCommand.Open or StartupCommand.Background)) await RunCommandAsync(Program.InitialCommand);
+    }
+
+    /// <summary>
+    /// Keeps the sign-in entry in line with the setting (it follows the installed program, which can move when the app is reinstalled).
+    /// Only for installed builds: a development build must never register itself to start with Windows.
+    /// </summary>
+    private void SyncStartupRegistration(AppSettings settings)
+    {
+        try
+        {
+            var startup = _services!.GetRequiredService<IStartupRegistration>();
+            var updates = _services!.GetRequiredService<IAppUpdateService>();
+            if (startup.IsSupported && updates.IsSupported) startup.Set(settings.StartWithWindows);
+        }
+        catch (Exception ex) { _log?.LogWarning(ex, "Could not synchronise the startup setting"); }
     }
 
     private void StartUpdateChecks(MainViewModel main)
@@ -217,6 +243,7 @@ public partial class App : Application
         {
             case StartupCommand.CaptureRegion: await capture.CaptureRegionAsync(); break;
             case StartupCommand.CaptureFullScreen: await capture.CaptureFullScreenAsync(); break;
+            case StartupCommand.Background: break; // a sign-in launch while Snaply is already running: nothing to do
             default: AppWindowController.ShowMainWindow(); break;
         }
     }

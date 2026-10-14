@@ -7,7 +7,7 @@ using Colors = Snaply.Editor.Model.Colors;
 
 namespace Snaply.App.Services;
 
-public enum InlineTool { None, Rectangle, Ellipse, Arrow, Highlight, Text, Step, Blur, Pixelate }
+public enum InlineTool { None, Rectangle, Ellipse, Arrow, Highlight, Text, Step, Blur, Pixelate, Line, Pen, Spotlight }
 
 /// <summary>
 /// Lightweight editing session used on the capture overlay. The whole monitor frame is the document source and the current
@@ -52,7 +52,16 @@ public sealed class InlineEditSession : IDisposable
     public InlineTool Tool { get; set; } = InlineTool.None;
     public uint Color { get; set; } = Colors.Red;
     public float Stroke { get; set; } = 4;
+    /// <summary>Style toggles from the options bar: stroke pattern, bold text, and the text backing (none / soft / solid / outline).</summary>
+    public StrokePattern Pattern { get; set; }
+    public ArrowHead ArrowHeadStyle { get; set; } = ArrowHead.End;
+    public float SpotlightDim { get; set; } = SpotlightAnnotation.DefaultDim;
+    public bool Bold { get; set; }
+    public TextBackgroundStyle TextBackground { get; set; }
+    private readonly List<DocPoint> _pen = new();
     public Bitmap? View { get; private set; }
+    /// <summary>The annotations drawn so far (read-only view, for tests and UI state).</summary>
+    public IReadOnlyList<Annotation> Annotations => _doc.Annotations;
     public bool CanUndo => _history.CanUndo;
     public bool CanRedo => _history.CanRedo;
     public bool HasEdits => _doc.Annotations.Count > 0;
@@ -72,14 +81,27 @@ public sealed class InlineEditSession : IDisposable
         var rect = DocRect.FromPoints(a, b);
         return Tool switch
         {
-            InlineTool.Rectangle => new RectangleAnnotation { Rect = rect, Color = Color, StrokeWidth = Stroke },
-            InlineTool.Ellipse => new EllipseAnnotation { Rect = rect, Color = Color, StrokeWidth = Stroke },
-            InlineTool.Arrow => new ArrowAnnotation { Start = a, End = b, Color = Color, StrokeWidth = Math.Max(Stroke, 3) },
+            InlineTool.Rectangle => new RectangleAnnotation { Rect = rect, Color = Color, StrokeWidth = Stroke, Pattern = Pattern },
+            InlineTool.Ellipse => new EllipseAnnotation { Rect = rect, Color = Color, StrokeWidth = Stroke, Pattern = Pattern },
+            InlineTool.Arrow => new ArrowAnnotation { Start = a, End = b, Color = Color, StrokeWidth = Math.Max(Stroke, 3), Head = ArrowHeadStyle, Pattern = Pattern },
+            InlineTool.Line => new ArrowAnnotation { Start = a, End = b, Color = Color, StrokeWidth = Math.Max(Stroke, 2), Head = ArrowHead.None, Pattern = Pattern },
+            InlineTool.Pen => CreatePen(a, b),
+            InlineTool.Spotlight => new SpotlightAnnotation { Rect = rect, Dim = SpotlightDim },
             InlineTool.Highlight => new HighlightAnnotation { Rect = rect, Color = Color == Colors.Red ? Colors.Yellow : Color },
             InlineTool.Blur => new BlurAnnotation { Rect = rect, Radius = Math.Max(8, Math.Min(rect.Width, rect.Height) / 6) },
             InlineTool.Pixelate => new PixelateAnnotation { Rect = rect, BlockSize = (int)Math.Max(8, Math.Min(rect.Width, rect.Height) / 8) },
             _ => null,
         };
+    }
+
+    private Annotation CreatePen(DocPoint start, DocPoint current)
+    {
+        if (_pen.Count == 0 || _pen[0] != start) { _pen.Clear(); _pen.Add(start); }
+        var last = _pen[^1];
+        if (Math.Abs(current.X - last.X) >= 1.5f || Math.Abs(current.Y - last.Y) >= 1.5f) _pen.Add(current);
+        var pts = _pen.ToList();
+        if (pts[^1] != current) pts.Add(current);
+        return new PenAnnotation { Points = pts.ToArray(), Color = Color, StrokeWidth = Math.Max(Stroke, 2), Pattern = Pattern };
     }
 
     public bool IsDragTool => Tool is not (InlineTool.None or InlineTool.Text or InlineTool.Step);
@@ -109,7 +131,8 @@ public sealed class InlineEditSession : IDisposable
         _previewing = false;
         var end = constrain ? Constrain(a, b) : b;
         var dx = end.X - a.X; var dy = end.Y - a.Y;
-        if (wasPreviewing && live is not null && Math.Sqrt(dx * dx + dy * dy) >= 3)
+        // A pen stroke can end where it began (a loop), so it is judged by having been drawn at all.
+        if (wasPreviewing && live is not null && (Tool == InlineTool.Pen || Math.Sqrt(dx * dx + dy * dy) >= 3))
             _history.Execute(new AddAnnotationCommand(live));
         else Render();
     }
@@ -117,7 +140,8 @@ public sealed class InlineEditSession : IDisposable
     private DocPoint Constrain(DocPoint a, DocPoint b)
     {
         var dx = b.X - a.X; var dy = b.Y - a.Y;
-        if (Tool == InlineTool.Arrow)
+        if (Tool == InlineTool.Pen) return b;
+        if (Tool is InlineTool.Arrow or InlineTool.Line)
         {
             var angle = Math.Round(Math.Atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
             var len = (float)Math.Sqrt(dx * dx + dy * dy);
@@ -130,7 +154,7 @@ public sealed class InlineEditSession : IDisposable
     public void AddText(DocPoint at, string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
-        _history.Execute(new AddAnnotationCommand(new TextAnnotation { Position = at, Text = text.TrimEnd(), Color = Color, FontSize = TextSize }));
+        _history.Execute(new AddAnnotationCommand(new TextAnnotation { Position = at, Text = text.TrimEnd(), Color = Color, FontSize = TextSize, Bold = Bold, Background = TextBackground }));
     }
 
     public void AddStep(DocPoint at) =>
@@ -198,17 +222,29 @@ public sealed class InlineEditSession : IDisposable
         else if (text != existing.Text) _history.Execute(new ReplaceAnnotationCommand(existing with { Text = text.TrimEnd() }));
     }
 
-    /// <summary>Applies the current colour/stroke to the selected annotation, if any.</summary>
-    public void RestyleSelected()
+    /// <summary>Which settings a restyle may change. A control only touches its own property, so toggling bold never recolours a selected line.</summary>
+    [Flags]
+    public enum RestyleScope { None = 0, ColorStroke = 1, Pattern = 2, Text = 4, Head = 8, Dim = 16 }
+
+    /// <summary>Applies the chosen settings to the selected annotation, if any. By default colour, stroke, pattern and text style.</summary>
+    public void RestyleSelected(RestyleScope scope = RestyleScope.ColorStroke | RestyleScope.Pattern | RestyleScope.Text)
     {
-        Annotation? updated = Selected switch
+        bool cs = scope.HasFlag(RestyleScope.ColorStroke), pt = scope.HasFlag(RestyleScope.Pattern), tx = scope.HasFlag(RestyleScope.Text);
+        bool hd = scope.HasFlag(RestyleScope.Head), dm = scope.HasFlag(RestyleScope.Dim);
+        var current = Selected;
+        Annotation? updated = current switch
         {
-            StyledAnnotation s when s.Color != Color || Math.Abs(s.StrokeWidth - Stroke) > 0.01 => s.WithStyle(Color, Stroke),
-            HighlightAnnotation h when h.Color != Color => h with { Color = Color },
-            TextAnnotation t when t.Color != Color || Math.Abs(t.FontSize - TextSize) > 0.5 => t with { Color = Color, FontSize = TextSize },
+            ArrowAnnotation ar => ar with { Color = cs ? Color : ar.Color, StrokeWidth = cs ? Math.Max(Stroke, 2) : ar.StrokeWidth, Pattern = pt ? Pattern : ar.Pattern, Head = hd ? ArrowHeadStyle : ar.Head },
+            RectangleAnnotation rc => rc with { Color = cs ? Color : rc.Color, StrokeWidth = cs ? Stroke : rc.StrokeWidth, Pattern = pt ? Pattern : rc.Pattern },
+            EllipseAnnotation el => el with { Color = cs ? Color : el.Color, StrokeWidth = cs ? Stroke : el.StrokeWidth, Pattern = pt ? Pattern : el.Pattern },
+            PenAnnotation pen => pen with { Color = cs ? Color : pen.Color, StrokeWidth = cs ? Math.Max(Stroke, 2) : pen.StrokeWidth, Pattern = pt ? Pattern : pen.Pattern },
+            StyledAnnotation s when cs => s.WithStyle(Color, Stroke),
+            HighlightAnnotation h when cs => h with { Color = Color },
+            TextAnnotation t => t with { Color = cs ? Color : t.Color, FontSize = cs ? TextSize : t.FontSize, Bold = tx ? Bold : t.Bold, Background = tx ? TextBackground : t.Background },
+            SpotlightAnnotation sp when dm => sp with { Dim = Math.Clamp(SpotlightDim, SpotlightAnnotation.MinDim, SpotlightAnnotation.MaxDim) },
             _ => null,
         };
-        if (updated is not null) _history.Execute(new ReplaceAnnotationCommand(updated));
+        if (updated is not null && !updated.Equals(current)) _history.Execute(new ReplaceAnnotationCommand(updated));
     }
 
     public void Undo() => _history.Undo();

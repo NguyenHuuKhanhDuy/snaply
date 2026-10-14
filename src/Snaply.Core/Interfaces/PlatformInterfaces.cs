@@ -27,6 +27,15 @@ public interface IClipboardService
     Task<Result> SetTextAsync(string text, CancellationToken ct = default);
 }
 
+/// <summary>Starts the app when the user signs in to the operating system (per user, never system-wide).</summary>
+public interface IStartupRegistration
+{
+    bool IsSupported { get; }
+    bool IsEnabled { get; }
+    /// <summary>Adds or removes the sign-in entry. Removing something that is not there succeeds.</summary>
+    Result Set(bool enabled);
+}
+
 public interface IShellService
 {
     bool CanRevealInFolder { get; }

@@ -17,7 +17,7 @@ using Snaply.Infrastructure.Storage;
 
 namespace Snaply.App.ViewModels;
 
-public enum EditorTool { Select, Crop, Rectangle, Ellipse, Arrow, Text, Blur, Pixelate, Highlight, Step, Redact }
+public enum EditorTool { Select, Crop, Rectangle, Ellipse, Arrow, Text, Blur, Pixelate, Highlight, Step, Redact, Line, Pen, Spotlight }
 
 public sealed record ToolInfo(EditorTool Tool, string Name, string Shortcut, string IconKey, string? Hint = null);
 
@@ -104,6 +104,14 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private ColorChoice _selectedColor;
     [ObservableProperty] private double _strokeWidth;
     [ObservableProperty] private Guid? _selectedId;
+    [ObservableProperty] private bool _textBold;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsBgNone), nameof(IsBgSoft), nameof(IsBgSolid), nameof(IsBgOutline))] private TextBackgroundStyle _textBackground;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(PatternIndex))] private StrokePattern _linePattern;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsHeadEnd), nameof(IsHeadBoth), nameof(IsHeadNone))] private ArrowHead _arrowHeadStyle = ArrowHead.End;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(SpotlightDim))] private double _spotlightPercent = SpotlightAnnotation.DefaultDim * 100;
+    /// <summary>True while the style controls are being loaded from the selected annotation, so loading never creates an undo step.</summary>
+    private bool _syncingStyle;
+    private readonly List<DocPoint> _penPath = new();
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ZoomText))] private double _zoom = 1;
     [ObservableProperty] private bool _showOcr;
     [ObservableProperty] private int _scalePercent = 100;
@@ -120,8 +128,33 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
     public string ZoomText => $"{Math.Round(Zoom * 100)}%";
     public string Title => Screenshot?.FileName ?? "Editor";
     public bool IsTextTool => Tool == EditorTool.Text;
-    public bool UsesStroke => Tool is EditorTool.Rectangle or EditorTool.Ellipse or EditorTool.Arrow or EditorTool.Text or EditorTool.Step or EditorTool.Select;
-    public bool UsesColor => Tool is not (EditorTool.Crop or EditorTool.Blur or EditorTool.Pixelate);
+    public bool UsesStroke => Tool is EditorTool.Rectangle or EditorTool.Ellipse or EditorTool.Arrow or EditorTool.Line or EditorTool.Pen or EditorTool.Text or EditorTool.Step or EditorTool.Select;
+    public bool UsesColor => Tool is not (EditorTool.Crop or EditorTool.Blur or EditorTool.Pixelate or EditorTool.Spotlight);
+
+    // ---- contextual style groups: shown for the active tool or for the selected annotation ----
+    private Annotation? SelectedAnnotation => SelectedId is { } id ? FindAnnotation(id) : null;
+    public bool ShowTextStyle => Tool == EditorTool.Text || SelectedAnnotation is TextAnnotation;
+    public bool ShowLineStyle => Tool is EditorTool.Line or EditorTool.Arrow or EditorTool.Pen or EditorTool.Rectangle or EditorTool.Ellipse
+        || SelectedAnnotation is ArrowAnnotation or PenAnnotation or RectangleAnnotation or EllipseAnnotation;
+    public bool ShowArrowHead => Tool == EditorTool.Arrow || SelectedAnnotation is ArrowAnnotation;
+    public bool ShowSpotlight => Tool == EditorTool.Spotlight || SelectedAnnotation is SpotlightAnnotation;
+    public bool IsHeadEnd => ArrowHeadStyle == ArrowHead.End;
+    public bool IsHeadBoth => ArrowHeadStyle == ArrowHead.Both;
+    public bool IsHeadNone => ArrowHeadStyle == ArrowHead.None;
+    public bool IsBgNone => TextBackground == TextBackgroundStyle.None;
+    public bool IsBgSoft => TextBackground == TextBackgroundStyle.Soft;
+    public bool IsBgSolid => TextBackground == TextBackgroundStyle.Solid;
+    public bool IsBgOutline => TextBackground == TextBackgroundStyle.Outline;
+    /// <summary>Index into <see cref="StrokePatterns.All"/> for the pattern list in the panel.</summary>
+    public int PatternIndex { get => (int)LinePattern; set { if (value >= 0 && value < StrokePatterns.All.Count) LinePattern = StrokePatterns.All[value]; } }
+    public IReadOnlyList<string> PatternNames { get; } = StrokePatterns.All.Select(StrokePatterns.Label).ToList();
+    public float SpotlightDim => (float)(SpotlightPercent / 100.0);
+
+    private void NotifyStyleGroups()
+    {
+        OnPropertyChanged(nameof(ShowTextStyle)); OnPropertyChanged(nameof(ShowLineStyle));
+        OnPropertyChanged(nameof(ShowArrowHead)); OnPropertyChanged(nameof(ShowSpotlight));
+    }
     public IReadOnlyList<int> ScaleOptions { get; } = new[] { 100, 75, 50, 25 };
 
     public event Action? ViewChanged;
@@ -214,9 +247,20 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
         UpdateToolButtons();
         if (value != EditorTool.Select) SelectedId = null;
         OnPropertyChanged(nameof(IsTextTool)); OnPropertyChanged(nameof(UsesStroke)); OnPropertyChanged(nameof(UsesColor));
+        NotifyStyleGroups();
         RequestRender(); // crop shows the uncropped image
         FitRequested?.Invoke();
     }
+
+    partial void OnSelectedIdChanged(Guid? value) => NotifyStyleGroups();
+    partial void OnTextBoldChanged(bool value) => RestyleSelection();
+    partial void OnTextBackgroundChanged(TextBackgroundStyle value) => RestyleSelection();
+    partial void OnLinePatternChanged(StrokePattern value) => RestyleSelection();
+    partial void OnArrowHeadStyleChanged(ArrowHead value) => RestyleSelection();
+    partial void OnSpotlightPercentChanged(double value) => RestyleSelection();
+
+    [RelayCommand] private void SetTextBackground(TextBackgroundStyle style) => TextBackground = style;
+    [RelayCommand] private void SetArrowHead(ArrowHead head) => ArrowHeadStyle = head;
 
     partial void OnSelectedColorChanged(ColorChoice value)
     {
@@ -232,14 +276,24 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
 
     private void RestyleSelection()
     {
-        if (History is null || Document is null || SelectedId is not { } id) return;
+        if (_syncingStyle || History is null || Document is null || SelectedId is not { } id) return;
         var ann = Document.Annotations.FirstOrDefault(a => a.Id == id);
         Annotation? updated = ann switch
         {
+            ArrowAnnotation ar when ar.Color != SelectedColor.Argb || Math.Abs(ar.StrokeWidth - Math.Max(StrokeWidth, 2)) > 0.01 || ar.Head != ArrowHeadStyle || ar.Pattern != LinePattern =>
+                ar with { Color = SelectedColor.Argb, StrokeWidth = (float)Math.Max(StrokeWidth, 2), Head = ShowArrowHead ? ArrowHeadStyle : ar.Head, Pattern = LinePattern },
+            RectangleAnnotation rc when rc.Color != SelectedColor.Argb || Math.Abs(rc.StrokeWidth - StrokeWidth) > 0.01 || rc.Pattern != LinePattern =>
+                rc with { Color = SelectedColor.Argb, StrokeWidth = (float)StrokeWidth, Pattern = LinePattern },
+            EllipseAnnotation el when el.Color != SelectedColor.Argb || Math.Abs(el.StrokeWidth - StrokeWidth) > 0.01 || el.Pattern != LinePattern =>
+                el with { Color = SelectedColor.Argb, StrokeWidth = (float)StrokeWidth, Pattern = LinePattern },
+            PenAnnotation pen when pen.Color != SelectedColor.Argb || Math.Abs(pen.StrokeWidth - StrokeWidth) > 0.01 || pen.Pattern != LinePattern =>
+                pen with { Color = SelectedColor.Argb, StrokeWidth = (float)StrokeWidth, Pattern = LinePattern },
+            SpotlightAnnotation sp when Math.Abs(sp.Dim - SpotlightDim) > 0.005 => sp with { Dim = Math.Clamp(SpotlightDim, SpotlightAnnotation.MinDim, SpotlightAnnotation.MaxDim) },
             StyledAnnotation s when s.Color != SelectedColor.Argb || Math.Abs(s.StrokeWidth - StrokeWidth) > 0.01 => s.WithStyle(SelectedColor.Argb, (float)StrokeWidth),
             HighlightAnnotation h when h.Color != SelectedColor.Argb => h with { Color = SelectedColor.Argb },
             RedactAnnotation r when (r.Color | 0xFF000000u) != (SelectedColor.Argb | 0xFF000000u) => r with { Color = SelectedColor.Argb | 0xFF000000u },
-            TextAnnotation t when t.Color != SelectedColor.Argb || Math.Abs(t.FontSize - TextSize) > 0.5 => t with { Color = SelectedColor.Argb, FontSize = TextSize },
+            TextAnnotation t when t.Color != SelectedColor.Argb || Math.Abs(t.FontSize - TextSize) > 0.5 || t.Bold != TextBold || t.Background != TextBackground =>
+                t with { Color = SelectedColor.Argb, FontSize = TextSize, Bold = TextBold, Background = TextBackground },
             _ => null,
         };
         if (updated is not null) History.Execute(new ReplaceAnnotationCommand(updated));
@@ -266,15 +320,31 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
         var width = (float)StrokeWidth;
         return Tool switch
         {
-            EditorTool.Rectangle => new RectangleAnnotation { Rect = rect, Color = color, StrokeWidth = width },
-            EditorTool.Ellipse => new EllipseAnnotation { Rect = rect, Color = color, StrokeWidth = width },
-            EditorTool.Arrow => new ArrowAnnotation { Start = a, End = b, Color = color, StrokeWidth = Math.Max(width, 3) },
+            EditorTool.Rectangle => new RectangleAnnotation { Rect = rect, Color = color, StrokeWidth = width, Pattern = LinePattern },
+            EditorTool.Ellipse => new EllipseAnnotation { Rect = rect, Color = color, StrokeWidth = width, Pattern = LinePattern },
+            EditorTool.Arrow => new ArrowAnnotation { Start = a, End = b, Color = color, StrokeWidth = Math.Max(width, 3), Head = ArrowHeadStyle, Pattern = LinePattern },
+            EditorTool.Line => new ArrowAnnotation { Start = a, End = b, Color = color, StrokeWidth = Math.Max(width, 2), Head = ArrowHead.None, Pattern = LinePattern },
+            EditorTool.Pen => CreatePen(a, b, color, width),
+            EditorTool.Spotlight => new SpotlightAnnotation { Rect = rect, Dim = SpotlightDim },
             EditorTool.Highlight => new HighlightAnnotation { Rect = rect, Color = color == Snaply.Editor.Model.Colors.Red ? Snaply.Editor.Model.Colors.Yellow : color },
             EditorTool.Redact => new RedactAnnotation { Rect = rect, Color = color is Snaply.Editor.Model.Colors.Black or Snaply.Editor.Model.Colors.White ? color : Snaply.Editor.Model.Colors.RedactFill },
             EditorTool.Blur => new BlurAnnotation { Rect = rect, Radius = Math.Max(8, Math.Min(rect.Width, rect.Height) / 6) },
             EditorTool.Pixelate => new PixelateAnnotation { Rect = rect, BlockSize = (int)Math.Max(8, Math.Min(rect.Width, rect.Height) / 8) },
             _ => null,
         };
+    }
+
+    private const float PenSpacing = 1.5f;
+
+    /// <summary>Collects the pointer path of the current drag (restarts when a new drag begins at a different point).</summary>
+    private Annotation CreatePen(DocPoint start, DocPoint current, uint color, float width)
+    {
+        if (_penPath.Count == 0 || _penPath[0] != start) { _penPath.Clear(); _penPath.Add(start); }
+        var last = _penPath[^1];
+        if (Math.Abs(current.X - last.X) >= PenSpacing || Math.Abs(current.Y - last.Y) >= PenSpacing) _penPath.Add(current);
+        var pts = _penPath.ToList();
+        if (pts[^1] != current) pts.Add(current);
+        return new PenAnnotation { Points = pts.ToArray(), Color = color, StrokeWidth = Math.Max(width, 2), Pattern = LinePattern };
     }
 
     public void BeginPreview(Annotation temp, bool isNew)
@@ -344,7 +414,7 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
     public void AddText(DocPoint at, string text)
     {
         if (string.IsNullOrWhiteSpace(text) || History is null) return;
-        History.Execute(new AddAnnotationCommand(new TextAnnotation { Position = at, Text = text.TrimEnd(), Color = SelectedColor.Argb, FontSize = TextSize }));
+        History.Execute(new AddAnnotationCommand(new TextAnnotation { Position = at, Text = text.TrimEnd(), Color = SelectedColor.Argb, FontSize = TextSize, Bold = TextBold, Background = TextBackground }));
     }
 
     public void UpdateText(TextAnnotation existing, string text)
@@ -369,13 +439,30 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
         SelectedId = id;
         if (id is { } i && FindAnnotation(i) is { } a)
         {
-            // Reflect the selected annotation's style in the toolbar without re-applying it.
-            var color = a switch { StyledAnnotation s => s.Color, HighlightAnnotation h => h.Color, TextAnnotation t => t.Color, _ => (uint?)null };
-            if (color is { } c && Colors.FirstOrDefault(x => x.Argb == c) is { } choice && choice != SelectedColor)
+            // Reflect the selected annotation's style in the controls without re-applying it (no undo step).
+            _syncingStyle = true;
+            try
             {
-                var keep = SelectedId; SelectedId = null; SelectedColor = choice; SelectedId = keep;
+                var color = a switch { StyledAnnotation s => s.Color, HighlightAnnotation h => h.Color, TextAnnotation t => t.Color, _ => (uint?)null };
+                if (color is { } c && Colors.FirstOrDefault(x => x.Argb == c) is { } choice && choice != SelectedColor) SelectedColor = choice;
+
+                switch (a)
+                {
+                    case TextAnnotation t:
+                        TextBold = t.Bold; TextBackground = t.Background;
+                        StrokeWidth = Math.Clamp((t.FontSize - 8) / 5.0, 1, 16);
+                        break;
+                    case ArrowAnnotation ar: LinePattern = ar.Pattern; ArrowHeadStyle = ar.Head; StrokeWidth = Math.Clamp(ar.StrokeWidth, 1, 16); break;
+                    case PenAnnotation pen: LinePattern = pen.Pattern; StrokeWidth = Math.Clamp(pen.StrokeWidth, 1, 16); break;
+                    case SpotlightAnnotation sp: SpotlightPercent = Math.Round(sp.Dim * 100); break;
+                    case RectangleAnnotation rc: LinePattern = rc.Pattern; StrokeWidth = Math.Clamp(rc.StrokeWidth, 1, 16); break;
+                    case EllipseAnnotation el: LinePattern = el.Pattern; StrokeWidth = Math.Clamp(el.StrokeWidth, 1, 16); break;
+                    case StyledAnnotation st: StrokeWidth = Math.Clamp(st.StrokeWidth, 1, 16); break;
+                }
             }
+            finally { _syncingStyle = false; }
         }
+        NotifyStyleGroups();
     }
 
     // ---- Commands ----
