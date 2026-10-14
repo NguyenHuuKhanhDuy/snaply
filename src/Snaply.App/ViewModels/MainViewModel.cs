@@ -167,6 +167,14 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand] private void ToggleSidebar() => IsSidebarCollapsed = !IsSidebarCollapsed;
+    // Opens Settings scrolled to the Updates section (used by the version label in the sidebar).
+    [RelayCommand]
+    private async Task OpenSettingsAsync()
+    {
+        _settings.RequestScroll("updates");
+        await NavigateAsync(NavDestination.Settings);
+        _settings.RequestScroll("updates");
+    }
     [RelayCommand] private Task CaptureRegionAsync() => _capture.CaptureRegionAsync();
     [RelayCommand] private Task CaptureFullScreenAsync() => _capture.CaptureFullScreenAsync();
 

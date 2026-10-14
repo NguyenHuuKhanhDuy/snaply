@@ -17,8 +17,13 @@ internal static class Program
 
         InitialCommand = StartupCommands.Parse(args);
 
-        // Tests and portable runs can use a separate scope so they never collide with the user's instance.
-        Instance = SingleInstance.Acquire(Environment.GetEnvironmentVariable("SNAPLY_INSTANCE_SCOPE"));
+        // Tests and portable runs can use a separate scope so they never collide with the user's instance. Debug builds get their own
+        // scope so running from the IDE never swallows a launch of the installed app (and vice versa).
+        var scope = Environment.GetEnvironmentVariable("SNAPLY_INSTANCE_SCOPE");
+#if DEBUG
+        scope ??= "debug-" + Environment.UserName;
+#endif
+        Instance = SingleInstance.Acquire(scope);
         if (!Instance.IsFirst)
         {
             Instance.SendToRunning(InitialCommand);

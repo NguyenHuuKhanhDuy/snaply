@@ -91,6 +91,11 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     public UpdateBannerViewModel Updates { get; }
 
+    /// <summary>Asks the settings page to scroll a section to the top ("updates"). Pending until the page is on screen.</summary>
+    public string? PendingScroll { get; set; }
+    public event Action? ScrollRequested;
+    public void RequestScroll(string section) { PendingScroll = section; ScrollRequested?.Invoke(); }
+
     public IReadOnlyList<int> DelayOptions { get; } = new[] { 0, 3, 5, 10 };
     public IReadOnlyList<string> FormatOptions { get; } = new[] { "PNG (lossless)", "JPEG (smaller)" };
     public ObservableCollection<ShortcutRowViewModel> Shortcuts { get; }
@@ -134,7 +139,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _canRemoveOrphans;
 
     // About
-    public string Version { get; } = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "0.1.0";
+    private static readonly string AssemblyVersion = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "0.1.0";
+    public string Version => Updates.IsSupported ? AssemblyVersion : AssemblyVersion + " (development build)";
     public string RuntimeText { get; } = RuntimeInformation.FrameworkDescription;
     public string OsText { get; } = $"{RuntimeInformation.OSDescription} ({RuntimeInformation.OSArchitecture})";
     public string SessionText => PlatformServices.IsWaylandSession() ? "Wayland" : OperatingSystem.IsLinux() ? "X11" : PlatformServices.DescribeOs();

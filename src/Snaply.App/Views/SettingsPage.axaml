@@ -4,8 +4,8 @@
              xmlns:c="using:Snaply.App.Controls"
              x:Class="Snaply.App.Views.SettingsPage"
              x:DataType="vm:SettingsViewModel">
-  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-    <StackPanel MaxWidth="820" Margin="32,28,32,40" Spacing="28" HorizontalAlignment="Stretch">
+  <ScrollViewer x:Name="SettingsScroll" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel x:Name="SettingsContent" MaxWidth="820" Margin="32,28,32,40" Spacing="28" HorizontalAlignment="Stretch">
       <StackPanel Spacing="4">
         <TextBlock Text="Settings" Classes="title" />
         <TextBlock Text="Changes are saved automatically." Classes="secondary" />
@@ -193,7 +193,7 @@
       </c:SectionCard>
 
       <!-- Updates -->
-      <c:SectionCard Title="Updates" Description="Snaply checks the public GitHub release list. No screenshots or personal data are sent.">
+      <c:SectionCard x:Name="UpdatesSection" Title="Updates" Description="Snaply checks the public GitHub release list. No screenshots or personal data are sent.">
         <StackPanel DataContext="{Binding Updates}" x:DataType="vm:UpdateBannerViewModel">
           <c:SettingsRow Title="Current version" Description="{Binding LastCheckedText}">
             <TextBlock Text="{Binding CurrentVersion}" FontWeight="Medium" />

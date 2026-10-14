@@ -27,7 +27,11 @@ public sealed partial class UpdateBannerViewModel : ObservableObject
 
     public bool IsSupported => _coordinator.IsSupported;
     public string? UnsupportedReason => _coordinator.UnsupportedReason;
-    public string CurrentVersion => _coordinator.CurrentVersion;
+    /// <summary>The running version; builds that are not installed through the installer are labelled so they are not mistaken for a release.</summary>
+    /// <summary>Compact version for the sidebar, e.g. "v0.1.1" or "v0.1.0 · dev".</summary>
+    public string ShortVersion => "v" + _coordinator.CurrentVersion + (IsSupported ? "" : " · dev");
+
+    public string CurrentVersion => IsSupported ? _coordinator.CurrentVersion : _coordinator.CurrentVersion + " (development build)";
 
     [ObservableProperty] private bool _bannerVisible;
     [ObservableProperty] private string _title = "";
@@ -40,6 +44,8 @@ public sealed partial class UpdateBannerViewModel : ObservableObject
     [ObservableProperty] private bool _restartEnabled = true;
     [ObservableProperty] private bool _showInstallLater;
     [ObservableProperty] private bool _hasNotes;
+    [ObservableProperty] private bool _hasUpdate;
+    [ObservableProperty] private string _updateTooltip = "";
 
     // About section
     [ObservableProperty] private string _statusText = "";
@@ -57,6 +63,8 @@ public sealed partial class UpdateBannerViewModel : ObservableObject
         BannerVisible = c.BannerVisible;
         Progress = c.Progress;
         HasNotes = !string.IsNullOrWhiteSpace(c.Available?.NotesMarkdown);
+        HasUpdate = c.Available is not null;
+        UpdateTooltip = c.Available is { } up ? $"Update available: {up.Version}. Click to see it in Settings." : $"Snaply {ShortVersion}";
         IsChecking = c.State == UpdateState.Checking;
 
         ShowUpdateNow = c.State == UpdateState.Available;

@@ -91,7 +91,14 @@
                     ToolTip.Tip="Expand sidebar" AutomationProperties.Name="Expand sidebar">
               <c:Icon Data="{DynamicResource IconSidebar}" Size="16" />
             </Button>
-            <TextBlock Text="Local only · nothing leaves this device" Classes="caption tertiary hideWhenCollapsed" TextWrapping="Wrap" Margin="6,6,0,0" />
+            <!-- Version; a dot appears when a newer version exists. Click opens Settings where the update lives. -->
+            <Button Classes="ghost" Command="{Binding OpenSettingsCommand}" ToolTip.Tip="{Binding Updates.UpdateTooltip}"
+                    HorizontalAlignment="Left" Padding="8,4" MinHeight="28" AutomationProperties.Name="Version and updates">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="{Binding Updates.ShortVersion}" Classes="caption secondary hideWhenCollapsed" VerticalAlignment="Center" />
+                <Ellipse Fill="{DynamicResource AccentBrush}" Width="9" Height="9" VerticalAlignment="Center" IsVisible="{Binding Updates.HasUpdate}" />
+              </StackPanel>
+            </Button>
           </StackPanel>
         </Grid>
       </Border>
