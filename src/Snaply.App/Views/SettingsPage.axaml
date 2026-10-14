@@ -274,18 +274,12 @@
       </c:SectionCard>
 
       <!-- About -->
-      <c:SectionCard x:Name="AboutSection" Title="About">
-        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="24" RowSpacing="8" Margin="0,12">
+      <c:SectionCard x:Name="AboutSection" Title="About" Description="Capture, annotate, find text and keep your screenshots organised. Everything stays on this device.">
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="24" RowSpacing="8" Margin="0,12">
           <TextBlock Text="Version" Classes="secondary" />
           <TextBlock Grid.Column="1" Text="{Binding Version}" />
-          <TextBlock Grid.Row="1" Text="Runtime" Classes="secondary" />
-          <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding RuntimeText}" />
-          <TextBlock Grid.Row="2" Text="System" Classes="secondary" />
-          <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding OsText}" TextWrapping="Wrap" />
-          <TextBlock Grid.Row="3" Text="Session" Classes="secondary" />
-          <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SessionText}" />
-          <TextBlock Grid.Row="4" Text="Documentation" Classes="secondary" />
-          <TextBlock Grid.Row="4" Grid.Column="1" Text="README.md and the docs/ folder in the Snaply source repository." TextWrapping="Wrap" />
+          <TextBlock Grid.Row="1" Text="Privacy" Classes="secondary" />
+          <TextBlock Grid.Row="1" Grid.Column="1" Text="Your screenshots and their text never leave your device. Snaply collects no usage data." TextWrapping="Wrap" />
         </Grid>
       </c:SectionCard>
       <c:EmptyState x:Name="NoResults" IsVisible="False" Icon="{DynamicResource IconSearch}" Title="No settings match your search"

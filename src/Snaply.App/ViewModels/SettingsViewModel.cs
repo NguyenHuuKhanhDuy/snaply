@@ -218,9 +218,6 @@ public sealed partial class SettingsViewModel : ViewModelBase
     // About
     private static readonly string AssemblyVersion = Assembly.GetEntryAssembly()?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "0.1.0";
     public string Version => Updates.IsSupported ? AssemblyVersion : AssemblyVersion + " (development build)";
-    public string RuntimeText { get; } = RuntimeInformation.FrameworkDescription;
-    public string OsText { get; } = $"{RuntimeInformation.OSDescription} ({RuntimeInformation.OSArchitecture})";
-    public string SessionText => PlatformServices.IsWaylandSession() ? "Wayland" : OperatingSystem.IsLinux() ? "X11" : PlatformServices.DescribeOs();
     public string DataDirectory => _paths.DataDirectory;
     public string LogDirectory => _paths.LogsDirectory;
     public string CaptureSupportText => _capture.Support.IsSupported ? (_capture.Support.Note ?? "Available") : _capture.Support.UnsupportedReason ?? "Unavailable";
