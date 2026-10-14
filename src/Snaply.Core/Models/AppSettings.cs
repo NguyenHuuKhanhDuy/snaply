@@ -10,17 +10,24 @@ public sealed class AppSettings
     public bool CopyToClipboardAfterCapture { get; set; }
     /// <summary>Auto-save: store every capture in the library as soon as it is finished.</summary>
     public bool SaveToLibraryAfterCapture { get; set; } = true;
-    /// <summary>After choosing a region, annotate it in place on the capture overlay (Lightshot style) before finishing.</summary>
+    /// <summary>After choosing a region, annotate it in place on the capture overlay before finishing.</summary>
     public bool EditAfterSelection { get; set; } = true;
     public bool OpenEditorAfterCapture { get; set; }
+    /// <summary>Tool preselected on the capture overlay once an area is chosen (a tool key such as "Rectangle"; "Select" = none).</summary>
+    public string DefaultCaptureTool { get; set; } = "Select";
     public MonitorTarget FullScreenTarget { get; set; } = MonitorTarget.UnderCursor;
     public int CaptureDelaySeconds { get; set; }
     public bool ReduceMotion { get; set; }
-    /// <summary>Check GitHub for a newer version shortly after startup (no data is sent).</summary>
+    /// <summary>Check online for a newer version shortly after startup (no data is sent).</summary>
     /// <summary>Closing the window hides it to the system tray so global shortcuts keep working.</summary>
     public bool RunInBackground { get; set; } = true;
+    /// <summary>The user hid the getting-started checklist on Home.</summary>
+    public bool OnboardingDismissed { get; set; }
+    public GalleryViewMode GalleryViewMode { get; set; } = GalleryViewMode.Grid;
     public bool AutoCheckUpdates { get; set; } = true;
     public DateTime? LastUpdateCheckUtc { get; set; }
+    /// <summary>Sensitive-data types (names of <c>SensitiveType</c>) the user turned off for redaction suggestions.</summary>
+    public List<string> DisabledRedactionTypes { get; set; } = new() { "Uuid" };
     public List<string> OcrLanguages { get; set; } = new() { "eng" };
     public Dictionary<string, string> Hotkeys { get; set; } = new(DefaultHotkeys);
 
@@ -35,10 +42,10 @@ public sealed class AppSettings
     {
         Theme = Theme, SaveDirectory = SaveDirectory, DefaultFormat = DefaultFormat,
         CopyToClipboardAfterCapture = CopyToClipboardAfterCapture, SaveToLibraryAfterCapture = SaveToLibraryAfterCapture, EditAfterSelection = EditAfterSelection,
-        OpenEditorAfterCapture = OpenEditorAfterCapture, FullScreenTarget = FullScreenTarget,
+        OpenEditorAfterCapture = OpenEditorAfterCapture, DefaultCaptureTool = DefaultCaptureTool, FullScreenTarget = FullScreenTarget,
         CaptureDelaySeconds = CaptureDelaySeconds, ReduceMotion = ReduceMotion,
-        RunInBackground = RunInBackground, AutoCheckUpdates = AutoCheckUpdates, LastUpdateCheckUtc = LastUpdateCheckUtc,
-        OcrLanguages = new List<string>(OcrLanguages), Hotkeys = new Dictionary<string, string>(Hotkeys),
+        RunInBackground = RunInBackground, OnboardingDismissed = OnboardingDismissed, GalleryViewMode = GalleryViewMode, AutoCheckUpdates = AutoCheckUpdates, LastUpdateCheckUtc = LastUpdateCheckUtc,
+        OcrLanguages = new List<string>(OcrLanguages), DisabledRedactionTypes = new List<string>(DisabledRedactionTypes), Hotkeys = new Dictionary<string, string>(Hotkeys),
     };
 }
 

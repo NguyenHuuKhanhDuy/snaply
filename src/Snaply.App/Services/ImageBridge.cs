@@ -61,7 +61,7 @@ public static class ImageBridge
         try
         {
             using var fs = File.OpenRead(path);
-            return Bitmap.DecodeToWidth(fs, maxWidth, BitmapInterpolationMode.MediumQuality);
+            return Bitmap.DecodeToWidth(fs, maxWidth, BitmapInterpolationMode.HighQuality);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or NotSupportedException)
         {

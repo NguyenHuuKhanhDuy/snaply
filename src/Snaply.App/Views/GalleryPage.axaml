@@ -3,10 +3,12 @@
              xmlns:vm="using:Snaply.App.ViewModels"
              xmlns:c="using:Snaply.App.Controls"
              xmlns:v="using:Snaply.App.Views"
+             xmlns:m="using:Snaply.Core.Models"
+             Focusable="True"
              x:Class="Snaply.App.Views.GalleryPage"
              x:DataType="vm:GalleryViewModel">
   <UserControl.Styles>
-    <Style Selector="UserControl.compact Border#DetailsHost">
+    <Style Selector=":is(UserControl).compact Border#DetailsHost">
       <Setter Property="Grid.Column" Value="0" />
       <Setter Property="Grid.ColumnSpan" Value="2" />
       <Setter Property="HorizontalAlignment" Value="Right" />
@@ -23,11 +25,35 @@
             <TextBlock Text="{Binding Title}" Classes="title" TextTrimming="CharacterEllipsis" />
             <TextBlock Text="{Binding CountText}" Classes="secondary" />
           </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+            <Button Classes="icon" Classes.active="{Binding IsGridMode}" Command="{Binding SetViewModeCommand}" CommandParameter="{x:Static m:GalleryViewMode.Grid}" ToolTip.Tip="Grid view" AutomationProperties.Name="Grid view">
+              <c:Icon Data="{DynamicResource IconImages}" Size="17" />
+            </Button>
+            <Button Classes="icon" Classes.active="{Binding IsListMode}" Command="{Binding SetViewModeCommand}" CommandParameter="{x:Static m:GalleryViewMode.List}" ToolTip.Tip="List view" AutomationProperties.Name="List view">
+              <c:Icon Data="{DynamicResource IconList}" Size="17" />
+            </Button>
+          </StackPanel>
         </Grid>
+        <!-- Selection bar: appears while screenshots are ticked -->
+        <Border Classes="card" IsVisible="{Binding HasChecked}" Padding="14,8" Background="{DynamicResource SelectionBrush}" BorderBrush="{DynamicResource AccentBrush}">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+              <TextBlock Text="{Binding SelectionText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <Button Classes="ghost" Content="Select all" Command="{Binding SelectAllCommand}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+              <Button Classes="secondary" Content="Favorite" Command="{Binding BulkFavoriteCommand}" CommandParameter="{x:True}" />
+              <Button Classes="secondary" Content="Tag…" Command="{Binding BulkTagCommand}" />
+              <Button Classes="secondary" Content="Export…" Command="{Binding BulkExportCommand}" />
+              <Button Classes="danger" Content="Delete" Command="{Binding BulkDeleteCommand}" />
+              <Button Classes="ghost" Content="Clear" Command="{Binding ClearSelectionCommand}" ToolTip.Tip="Clear selection (Esc)" />
+            </StackPanel>
+          </Grid>
+        </Border>
         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
           <TextBox Text="{Binding SearchText}" Watermark="Search by file name or text in the image" AutomationProperties.Name="Search screenshots">
             <TextBox.InnerLeftContent>
-              <c:Icon Data="{DynamicResource IconSearch}" Size="16" Margin="10,0,0,0" />
+              <c:Icon Data="{DynamicResource IconSearch}" Size="16" Margin="10,0,0,0" VerticalAlignment="Center" />
             </TextBox.InnerLeftContent>
             <TextBox.InnerRightContent>
               <Button Classes="icon" Width="26" Height="26" Margin="0,0,4,0" Command="{Binding ClearFiltersCommand}" IsVisible="{Binding HasFilters}" ToolTip.Tip="Clear search and filters" AutomationProperties.Name="Clear filters">
@@ -48,13 +74,33 @@
       <Grid Grid.Row="1">
         <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled" Padding="28,4,14,24">
           <StackPanel>
-            <ItemsControl ItemsSource="{Binding Items}">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
+            <ItemsControl ItemsSource="{Binding Groups}">
               <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:ScreenshotItemViewModel">
-                  <c:ScreenshotTile Margin="0,0,14,14" ClickCommand="{Binding $parent[UserControl].((vm:GalleryViewModel)DataContext).SelectCommand}" />
+                <DataTemplate x:DataType="vm:DayGroupViewModel">
+                  <StackPanel Margin="0,0,0,6">
+                    <TextBlock Text="{Binding Title}" Classes="subtitle" Margin="0,10,0,10" />
+                    <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding $parent[v:GalleryPage].((vm:GalleryViewModel)DataContext).IsGridMode}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ScreenshotItemViewModel">
+                          <c:ScreenshotTile Margin="0,0,14,14"
+                                            ModifierClickCommand="{Binding $parent[v:GalleryPage].((vm:GalleryViewModel)DataContext).TileClickCommand}"
+                                            CheckCommand="{Binding $parent[v:GalleryPage].((vm:GalleryViewModel)DataContext).ToggleCheckCommand}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding $parent[v:GalleryPage].((vm:GalleryViewModel)DataContext).IsListMode}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ScreenshotItemViewModel">
+                          <c:ScreenshotRow Margin="0,0,0,4"
+                                           ModifierClickCommand="{Binding $parent[v:GalleryPage].((vm:GalleryViewModel)DataContext).TileClickCommand}"
+                                           CheckCommand="{Binding $parent[v:GalleryPage].((vm:GalleryViewModel)DataContext).ToggleCheckCommand}" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
@@ -62,6 +108,10 @@
           </StackPanel>
         </ScrollViewer>
 
+        <StackPanel IsVisible="{Binding ShowInitialLoading}" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12" Width="220">
+          <TextBlock Text="Loading your screenshots…" Classes="secondary" HorizontalAlignment="Center" />
+          <ProgressBar IsIndeterminate="True" Height="3" />
+        </StackPanel>
         <c:EmptyState IsVisible="{Binding ShowEmptyLibrary}" Icon="{DynamicResource IconImages}" Title="{Binding EmptyTitle}" Description="{Binding EmptyHint}" />
         <c:EmptyState IsVisible="{Binding ShowNoResults}" Icon="{DynamicResource IconSearch}" Title="No matching screenshots" Description="Try a different search or clear the filters.">
           <Button Classes="secondary" Content="Clear filters" Command="{Binding ClearFiltersCommand}" />

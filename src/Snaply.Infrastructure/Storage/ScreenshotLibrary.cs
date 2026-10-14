@@ -102,13 +102,15 @@ public sealed class ScreenshotLibrary : IScreenshotLibrary
 
     public async Task<Result> EnsureThumbnailAsync(Screenshot screenshot, CancellationToken ct = default)
     {
-        if (screenshot.ThumbnailPath is not null && File.Exists(screenshot.ThumbnailPath)) return Result.Ok();
+        if (ThumbnailService.IsCurrent(screenshot.ThumbnailPath) && File.Exists(screenshot.ThumbnailPath)) return Result.Ok();
+        var stale = screenshot.ThumbnailPath;
         if (!File.Exists(screenshot.FilePath)) return Result.Fail(ErrorCode.NotFound, "The screenshot file cannot be found.");
 
         var thumb = await _thumbs.GenerateAsync(screenshot.FilePath, ct).ConfigureAwait(false);
         if (!thumb.IsSuccess) return Result.Fail(thumb.Error!);
 
         screenshot.ThumbnailPath = thumb.Value;
+        if (stale is not null && !string.Equals(stale, thumb.Value, StringComparison.OrdinalIgnoreCase)) ImageStorageService.TryDelete(stale);
         await _repo.UpdateFileInfoAsync(screenshot.Id, thumb.Value, ct).ConfigureAwait(false);
         return Result.Ok();
     }

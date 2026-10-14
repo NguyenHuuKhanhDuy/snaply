@@ -7,6 +7,8 @@ using Snaply.Infrastructure.Storage;
 namespace Snaply.App.Services;
 
 /// <summary>User-facing operations on stored screenshots, with notifications. Shared by gallery, details and editor.</summary>
+public sealed record BulkResult(int Succeeded, IReadOnlyList<string> Failures);
+
 public sealed class ScreenshotActions
 {
     private readonly IScreenshotLibrary _library;
@@ -104,6 +106,106 @@ public sealed class ScreenshotActions
         await _repo.SetFavoriteAsync(shot.Id, value).ConfigureAwait(true);
         shot.IsFavorite = value;
         _events.RaiseChanged();
+    }
+
+
+    // ---- bulk operations (gallery multi-select) ----
+
+    /// <summary>Deletes several screenshots after one confirmation. Each failure is reported; the others still go through.</summary>
+    public async Task<BulkResult?> DeleteManyAsync(IReadOnlyList<Screenshot> shots)
+    {
+        if (shots.Count == 0) return null;
+        var ok = await _dialogs.ConfirmAsync($"Delete {shots.Count} screenshot{(shots.Count == 1 ? "" : "s")}?",
+            "They will be permanently deleted from your library and from disk. This cannot be undone.", "Delete", "Cancel", danger: true).ConfigureAwait(true);
+        if (!ok) return null;
+
+        var failures = new List<string>();
+        var done = 0;
+        foreach (var s in shots)
+        {
+            var r = await _library.DeleteAsync(s.Id).ConfigureAwait(true);
+            if (r.IsSuccess || r.Error!.Code == ErrorCode.NotFound) done++;
+            else failures.Add($"{s.FileName}: {r.Error.Message}");
+        }
+        _events.RaiseChanged();
+        Report("deleted", done, failures);
+        return new BulkResult(done, failures);
+    }
+
+    public async Task<BulkResult> SetFavoriteManyAsync(IReadOnlyList<Screenshot> shots, bool value)
+    {
+        var failures = new List<string>();
+        var done = 0;
+        foreach (var s in shots)
+        {
+            try { await _repo.SetFavoriteAsync(s.Id, value).ConfigureAwait(true); s.IsFavorite = value; done++; }
+            catch (Exception ex) when (ex is Microsoft.EntityFrameworkCore.DbUpdateException or InvalidOperationException) { failures.Add($"{s.FileName}: could not be updated"); }
+        }
+        _events.RaiseChanged();
+        Report(value ? "added to favorites" : "removed from favorites", done, failures);
+        return new BulkResult(done, failures);
+    }
+
+    public async Task<BulkResult?> TagManyAsync(IReadOnlyList<Screenshot> shots, string? tagName)
+    {
+        var name = tagName?.Trim();
+        if (shots.Count == 0 || string.IsNullOrEmpty(name)) return null;
+        if (name.Length > 50) { _notes.Show(NotificationKind.Warning, "Tag is too long", "Tags can be at most 50 characters."); return null; }
+
+        var tag = await _repo.GetOrCreateTagAsync(name).ConfigureAwait(true);
+        var failures = new List<string>();
+        var done = 0;
+        foreach (var s in shots)
+        {
+            try { await _repo.AddTagAsync(s.Id, tag.Id).ConfigureAwait(true); done++; }
+            catch (Exception ex) when (ex is Microsoft.EntityFrameworkCore.DbUpdateException or InvalidOperationException) { failures.Add($"{s.FileName}: could not be tagged"); }
+        }
+        _events.RaiseChanged();
+        Report($"tagged “{name}”", done, failures);
+        return new BulkResult(done, failures);
+    }
+
+    /// <summary>Copies the original files to a chosen folder, never overwriting: name clashes get a numeric suffix.</summary>
+    public async Task<BulkResult?> ExportManyAsync(IReadOnlyList<Screenshot> shots)
+    {
+        if (shots.Count == 0) return null;
+        var folder = await _dialogs.PickFolderAsync("Choose where to export").ConfigureAwait(true);
+        if (folder is null) return null;
+
+        var failures = new List<string>();
+        var done = 0;
+        foreach (var s in shots)
+        {
+            try
+            {
+                if (!File.Exists(s.FilePath)) { failures.Add($"{s.FileName}: the file is missing"); continue; }
+                var bytes = await File.ReadAllBytesAsync(s.FilePath).ConfigureAwait(true);
+                var r = await _storage.ExportAsync(bytes, UniquePath(folder, s.FileName), overwrite: false).ConfigureAwait(true);
+                if (r.IsSuccess) done++; else failures.Add($"{s.FileName}: {r.Error!.Message}");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { failures.Add($"{s.FileName}: could not be read"); }
+        }
+        Report("exported", done, failures);
+        return new BulkResult(done, failures);
+    }
+
+    public static string UniquePath(string folder, string fileName)
+    {
+        var path = Path.Combine(folder, fileName);
+        if (!File.Exists(path)) return path;
+        var stem = Path.GetFileNameWithoutExtension(fileName); var ext = Path.GetExtension(fileName);
+        for (var i = 1; ; i++)
+        {
+            path = Path.Combine(folder, $"{stem}-{i}{ext}");
+            if (!File.Exists(path)) return path;
+        }
+    }
+
+    private void Report(string verb, int done, IReadOnlyList<string> failures)
+    {
+        if (failures.Count == 0) { _notes.Show(NotificationKind.Success, $"{done} screenshot{(done == 1 ? "" : "s")} {verb}"); return; }
+        var detail = string.Join("\n", failures.Take(3)) + (failures.Count > 3 ? $"\n…and {failures.Count - 3} more" : "");
+        _notes.Show(NotificationKind.Warning, $"{done} {verb}, {failures.Count} failed", detail);
     }
 
     public void MissingFile() =>

@@ -106,11 +106,13 @@ public sealed class CaptureOrchestrator
         var virtualBounds = PixelRect.Union(monitors.Select(m => m.Bounds));
         var delay = delayOverride ?? settings.CaptureDelaySeconds;
 
-        await _window.HideAsync().ConfigureAwait(false);
+        var hidden = await _window.HideAsync().ConfigureAwait(false);
         try
         {
-            // Give the compositor time to remove our window from the screen before grabbing pixels.
-            await Task.Delay(delay > 0 ? TimeSpan.FromSeconds(delay) : TimeSpan.FromMilliseconds(180), ct).ConfigureAwait(false);
+            // Give the compositor time to remove our window from the screen before grabbing pixels. When no window of ours was
+            // showing (background/tray use) there is nothing to wait for, so the capture starts immediately.
+            var wait = delay > 0 ? TimeSpan.FromSeconds(delay) : hidden ? TimeSpan.FromMilliseconds(120) : TimeSpan.Zero;
+            if (wait > TimeSpan.Zero) await Task.Delay(wait, ct).ConfigureAwait(false);
 
             PixelRect area;
             RawImage image;
@@ -129,7 +131,9 @@ public sealed class CaptureOrchestrator
             }
             else
             {
+                var grab = System.Diagnostics.Stopwatch.StartNew();
                 var frame = await _capture.CaptureAsync(virtualBounds, ct).ConfigureAwait(false);
+                _log.LogDebug("Screen grab of {Width}x{Height} took {Ms} ms (window hidden: {Hidden})", virtualBounds.Width, virtualBounds.Height, grab.ElapsedMilliseconds, hidden);
                 if (!frame.IsSuccess) return Result<CaptureOutcome>.Fail(frame.Error!);
 
                 RegionSelection? selection;
@@ -137,7 +141,7 @@ public sealed class CaptureOrchestrator
                 else
                 {
                     var preselect = mode == CaptureMode.FullScreen ? ResolveFullScreenArea(monitors, virtualBounds, settings.FullScreenTarget) : (PixelRect?)null;
-                    var options = new RegionSelectOptions(inline && fixedArea is null, settings.SaveToLibraryAfterCapture, settings.CopyToClipboardAfterCapture, preselect);
+                    var options = new RegionSelectOptions(inline && fixedArea is null, settings.SaveToLibraryAfterCapture, settings.CopyToClipboardAfterCapture, preselect, settings.DefaultCaptureTool);
                     selection = await _selector.SelectAsync(frame.Value, virtualBounds, monitors, options, ct).ConfigureAwait(false);
                 }
                 if (selection is null) return Result<CaptureOutcome>.Fail(ErrorCode.Cancelled, "Capture cancelled.");

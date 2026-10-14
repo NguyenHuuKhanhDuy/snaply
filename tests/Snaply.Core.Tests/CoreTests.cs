@@ -231,7 +231,7 @@ public class CaptureOrchestratorTests
         _library.AddAsync(Arg.Any<RawImage>(), Arg.Any<CaptureMethod>(), Arg.Any<CancellationToken>())
             .Returns(Result<Screenshot>.Ok(new Screenshot { Id = 7 }));
         _clipboard.SetImageAsync(Arg.Any<RawImage>(), Arg.Any<CancellationToken>()).Returns(Result.Ok());
-        _window.HideAsync().Returns(Task.CompletedTask);
+        _window.HideAsync().Returns(Task.FromResult(true));
         _window.RestoreAsync().Returns(Task.CompletedTask);
     }
 

@@ -71,6 +71,7 @@ public sealed class EditorCanvas : Control
     private void Attach(EditorViewModel vm)
     {
         vm.PropertyChanged += OnEditorPropertyChanged;
+        vm.Redaction.Changed += OnSuggestionsChanged;
         vm.ViewChanged += OnViewChanged;
         vm.FitRequested += OnFitRequested;
     }
@@ -78,6 +79,7 @@ public sealed class EditorCanvas : Control
     private void Detach(EditorViewModel vm)
     {
         vm.PropertyChanged -= OnEditorPropertyChanged;
+        vm.Redaction.Changed -= OnSuggestionsChanged;
         vm.ViewChanged -= OnViewChanged;
         vm.FitRequested -= OnFitRequested;
     }
@@ -106,6 +108,8 @@ public sealed class EditorCanvas : Control
         else { ClampOrigin(); }
         InvalidateVisual();
     }
+
+    private void OnSuggestionsChanged() => InvalidateVisual();
 
     private void OnFitRequested()
     {
@@ -214,6 +218,12 @@ public sealed class EditorCanvas : Control
         if (!props.IsLeftButtonPressed) return;
 
         var doc = ViewToDoc(pos);
+        // With the Select tool, a click on a highlighted suggestion toggles it. Drawing tools are left alone so boxes can start anywhere.
+        if (Editor.Tool == EditorTool.Select && Editor.Redaction.HasSuggestions && Editor.HitTest(doc, 4) is null && Editor.Redaction.ToggleAt(doc))
+        {
+            e.Handled = true;
+            return;
+        }
         _dragStart = doc; _dragCurrent = doc;
         _previewStarted = false;
 
@@ -465,6 +475,8 @@ public sealed class EditorCanvas : Control
             return;
         }
 
+        DrawSuggestions(context, vm);
+
         if (vm.SelectedId is { } id && vm.FindAnnotation(id) is { } sel)
         {
             var r = DocToView(sel.Bounds).Inflate(sel is TextAnnotation ? 3 : 2);
@@ -472,6 +484,19 @@ public sealed class EditorCanvas : Control
             if (sel.CanResize)
                 foreach (var p in HandlePoints(DocToView(sel.Bounds)))
                     context.DrawRectangle(Brushes.White, accentPen, new Rect(p.X - HandleSize / 2 + 1, p.Y - HandleSize / 2 + 1, HandleSize - 2, HandleSize - 2), 2, 2);
+        }
+    }
+
+    /// <summary>Suggested regions: dashed amber while undecided, solid with a check tint once chosen. They are not part of the document.</summary>
+    private void DrawSuggestions(DrawingContext context, EditorViewModel vm)
+    {
+        foreach (var s in vm.Redaction.All)
+        {
+            var on = s.IsChecked;
+            var fill = new SolidColorBrush(on ? Color.FromArgb(120, 229, 72, 77) : Color.FromArgb(46, 255, 184, 0));
+            var pen = new Pen(new SolidColorBrush(on ? Color.FromRgb(229, 72, 77) : Color.FromRgb(255, 184, 0)), on ? 2 : 1.5, on ? null : DashStyle.Dash);
+            foreach (var region in s.Finding.Regions)
+                context.DrawRectangle(fill, pen, DocToView(new DocRect(region.X, region.Y, region.Width, region.Height)));
         }
     }
 

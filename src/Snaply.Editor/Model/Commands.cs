@@ -16,6 +16,21 @@ public sealed class AddAnnotationCommand : IEditorCommand
     public void Undo(EditorDocument doc) => doc.Annotations.RemoveAll(a => a.Id == _annotation.Id);
 }
 
+/// <summary>Adds several annotations as a single undoable step (for example every region chosen from the redaction suggestions).</summary>
+public sealed class AddAnnotationsCommand : IEditorCommand
+{
+    private readonly IReadOnlyList<Annotation> _annotations;
+    private readonly string _name;
+    public AddAnnotationsCommand(IReadOnlyList<Annotation> annotations, string name) { _annotations = annotations; _name = name; }
+    public string Name => _name;
+    public void Do(EditorDocument doc) => doc.Annotations.AddRange(_annotations);
+    public void Undo(EditorDocument doc)
+    {
+        var ids = _annotations.Select(a => a.Id).ToHashSet();
+        doc.Annotations.RemoveAll(a => ids.Contains(a.Id));
+    }
+}
+
 public sealed class RemoveAnnotationCommand : IEditorCommand
 {
     private readonly Guid _id;

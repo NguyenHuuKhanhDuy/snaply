@@ -17,9 +17,9 @@ using Snaply.Infrastructure.Storage;
 
 namespace Snaply.App.ViewModels;
 
-public enum EditorTool { Select, Crop, Rectangle, Ellipse, Arrow, Text, Blur, Pixelate, Highlight, Step }
+public enum EditorTool { Select, Crop, Rectangle, Ellipse, Arrow, Text, Blur, Pixelate, Highlight, Step, Redact }
 
-public sealed record ToolInfo(EditorTool Tool, string Name, string Shortcut, string IconKey);
+public sealed record ToolInfo(EditorTool Tool, string Name, string Shortcut, string IconKey, string? Hint = null);
 
 public sealed partial class ToolButtonViewModel : ObservableObject
 {
@@ -31,7 +31,7 @@ public sealed partial class ToolButtonViewModel : ObservableObject
 
     public ToolInfo Info { get; }
     public Geometry Icon { get; }
-    public string Tip => $"{Info.Name} ({Info.Shortcut})";
+    public string Tip => Info.Hint is null ? $"{Info.Name} ({Info.Shortcut})" : $"{Info.Name} ({Info.Shortcut}) – {Info.Hint}";
     [ObservableProperty] private bool _isActive;
 }
 
@@ -66,36 +66,29 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
 
     public EditorViewModel(IScreenshotRepository repo, IScreenshotLibrary library, ScreenshotActions actions, IClipboardService clipboard,
         DialogService dialogs, INotificationService notes, ImageStorageService storage, IApplicationSettingsService settings, LibraryEvents events,
-        OcrPanelViewModel ocr, ILogger<EditorViewModel> log)
+        OcrPanelViewModel ocr, RedactionViewModel redaction, ILogger<EditorViewModel> log)
     {
         _repo = repo; _library = library; _actions = actions; _clipboard = clipboard; _dialogs = dialogs; _notes = notes;
         _storage = storage; _settings = settings; _events = events; _log = log;
         Ocr = ocr;
+        Redaction = redaction;
+        Redaction.Attach(this);
         ToolButtons = Tools.Select(t => new ToolButtonViewModel(t)).ToList();
         UpdateToolButtons();
-        Colors = Snaply.Editor.Model.Colors.Palette.Select(c => new ColorChoice(c)).ToList();
+        Colors = Snaply.Editor.Model.AnnotationToolset.Palette.Select(c => new ColorChoice(c)).ToList();
         _selectedColor = Colors[0];
         _selectedColor.IsSelected = true;
-        _strokeWidth = 4;
+        _strokeWidth = Snaply.Editor.Model.AnnotationToolset.DefaultStroke;
     }
 
-    public static IReadOnlyList<ToolInfo> Tools { get; } = new[]
-    {
-        new ToolInfo(EditorTool.Select, "Select", "V", "IconSelect"),
-        new ToolInfo(EditorTool.Crop, "Crop", "C", "IconCrop"),
-        new ToolInfo(EditorTool.Rectangle, "Rectangle", "R", "IconSquare"),
-        new ToolInfo(EditorTool.Ellipse, "Ellipse", "O", "IconCircle"),
-        new ToolInfo(EditorTool.Arrow, "Arrow", "A", "IconArrow"),
-        new ToolInfo(EditorTool.Text, "Text", "T", "IconType"),
-        new ToolInfo(EditorTool.Highlight, "Highlight", "H", "IconHighlight"),
-        new ToolInfo(EditorTool.Step, "Numbered step", "N", "IconStep"),
-        new ToolInfo(EditorTool.Blur, "Blur", "B", "IconBlur"),
-        new ToolInfo(EditorTool.Pixelate, "Pixelate", "P", "IconPixelate"),
-    };
+    public static IReadOnlyList<ToolInfo> Tools { get; } = Snaply.Editor.Model.AnnotationToolset.Tools
+        .Select(t => new ToolInfo(Enum.Parse<EditorTool>(t.Kind.ToString()), t.Name, t.Shortcut.ToString(), t.IconKey, t.Hint))
+        .ToList();
 
     public IReadOnlyList<ToolButtonViewModel> ToolButtons { get; }
     public IReadOnlyList<ColorChoice> Colors { get; }
     public OcrPanelViewModel Ocr { get; }
+    public RedactionViewModel Redaction { get; }
     public Screenshot? Screenshot { get; private set; }
     public EditorDocument? Document { get; private set; }
     public CommandHistory? History { get; private set; }
@@ -117,6 +110,10 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _canUndo;
     [ObservableProperty] private bool _canRedo;
     [ObservableProperty] private bool _hasCrop;
+    /// <summary>The document has at least one solid redaction box.</summary>
+    [ObservableProperty] private bool _hasRedactions;
+    /// <summary>After saving a redacted copy, also offer to delete the original (always confirmed, off by default).</summary>
+    [ObservableProperty] private bool _deleteOriginalAfterRedact;
     [ObservableProperty] private string _sizeText = "";
     [ObservableProperty] private bool _isBusy;
 
@@ -157,6 +154,7 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
         History.Changed += OnHistoryChanged;
 
         Ocr.SetScreenshot(shot);
+        Redaction.Reset();
         OnPropertyChanged(nameof(Title));
         SyncFromDocument();
         IsLoading = false;
@@ -177,6 +175,7 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
         if (History is null || Document is null) return;
         CanUndo = History.CanUndo; CanRedo = History.CanRedo;
         HasCrop = Document.Crop is not null;
+        HasRedactions = Document.Annotations.OfType<RedactAnnotation>().Any();
         ScalePercent = (int)Math.Round(Document.ExportScale * 100);
         var (w, h) = Document.OutputSize;
         SizeText = $"{w} × {h} px";
@@ -239,6 +238,7 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
         {
             StyledAnnotation s when s.Color != SelectedColor.Argb || Math.Abs(s.StrokeWidth - StrokeWidth) > 0.01 => s.WithStyle(SelectedColor.Argb, (float)StrokeWidth),
             HighlightAnnotation h when h.Color != SelectedColor.Argb => h with { Color = SelectedColor.Argb },
+            RedactAnnotation r when (r.Color | 0xFF000000u) != (SelectedColor.Argb | 0xFF000000u) => r with { Color = SelectedColor.Argb | 0xFF000000u },
             TextAnnotation t when t.Color != SelectedColor.Argb || Math.Abs(t.FontSize - TextSize) > 0.5 => t with { Color = SelectedColor.Argb, FontSize = TextSize },
             _ => null,
         };
@@ -270,6 +270,7 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
             EditorTool.Ellipse => new EllipseAnnotation { Rect = rect, Color = color, StrokeWidth = width },
             EditorTool.Arrow => new ArrowAnnotation { Start = a, End = b, Color = color, StrokeWidth = Math.Max(width, 3) },
             EditorTool.Highlight => new HighlightAnnotation { Rect = rect, Color = color == Snaply.Editor.Model.Colors.Red ? Snaply.Editor.Model.Colors.Yellow : color },
+            EditorTool.Redact => new RedactAnnotation { Rect = rect, Color = color is Snaply.Editor.Model.Colors.Black or Snaply.Editor.Model.Colors.White ? color : Snaply.Editor.Model.Colors.RedactFill },
             EditorTool.Blur => new BlurAnnotation { Rect = rect, Radius = Math.Max(8, Math.Min(rect.Width, rect.Height) / 6) },
             EditorTool.Pixelate => new PixelateAnnotation { Rect = rect, BlockSize = (int)Math.Max(8, Math.Min(rect.Width, rect.Height) / 8) },
             _ => null,
@@ -443,6 +444,45 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
         finally { IsBusy = false; }
     }
 
+    /// <summary>
+    /// Writes the flattened image as a new screenshot. The copy has no stored OCR text and no editable annotation document, so nothing
+    /// that was covered can be recovered from it or found through search. The original is left as it is unless the user also asks to delete it.
+    /// </summary>
+    [RelayCommand]
+    private async Task SaveRedactedCopyAsync()
+    {
+        if (Document is null || Screenshot is null) return;
+        if (!HasRedactions)
+        {
+            _notes.Show(NotificationKind.Info, "Nothing is covered yet", "Draw a Redact box or cover suggestions first.");
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            var format = _settings.Current.DefaultFormat;
+            var (w, h) = Document.OutputSize;
+            var bytes = await Task.Run(() => { using var bmp = RenderFinal(); return bmp is null ? null : ImageCodec.Encode(bmp, format); }).ConfigureAwait(true);
+            if (bytes is null) return;
+
+            var added = await _library.AddEncodedAsync(bytes, ImageCodec.Extension(format), w, h, CaptureMethod.Edited).ConfigureAwait(true);
+            if (!added.IsSuccess) { _notes.Show(NotificationKind.Error, "Could not save", added.Error!.Message); return; }
+
+            var tag = await _repo.GetOrCreateTagAsync("Redacted").ConfigureAwait(true);
+            await _repo.AddTagAsync(added.Value.Id, tag.Id).ConfigureAwait(true);
+            _events.RaiseChanged();
+            _notes.Show(NotificationKind.Success, "Redacted copy saved", $"{added.Value.FileName}. The original still contains the covered content.");
+
+            if (DeleteOriginalAfterRedact && await _actions.DeleteAsync(Screenshot).ConfigureAwait(true))
+            {
+                _dirty = false; // the original is gone: nothing to save for it when leaving
+                Back?.Invoke();
+            }
+        }
+        finally { IsBusy = false; }
+    }
+
     [RelayCommand]
     private async Task ExportAsync()
     {
@@ -489,7 +529,11 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
         Back?.Invoke();
     }
 
-    public override async Task OnNavigatedFromAsync() => await SaveEditsAsync(false).ConfigureAwait(true);
+    public override async Task OnNavigatedFromAsync()
+    {
+        Redaction.Reset(); // cancels a running scan and drops suggestions: they only make sense for this visit
+        await SaveEditsAsync(false).ConfigureAwait(true);
+    }
 
     public void Dispose()
     {

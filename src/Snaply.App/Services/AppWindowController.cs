@@ -17,16 +17,39 @@ public sealed class AppWindowController : IAppWindowController
 
     private static Window? Main => (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.MainWindow;
 
-    public Task HideAsync() => Dispatcher.UIThread.InvokeAsync(() =>
+    public Task<bool> HideAsync() => Dispatcher.UIThread.InvokeAsync(() =>
     {
         var w = Main;
         _wasVisible = w is { IsVisible: true, WindowState: not WindowState.Minimized };
-        if (_wasVisible) w!.Hide();
+        if (_wasVisible)
+        {
+            // Without this Windows fades the window out over ~200 ms, and the fading frame would end up in the capture.
+            SetWindowTransitions(w!, enabled: false);
+            w!.Hide();
+        }
+        return _wasVisible;
     }).GetTask();
+
+    private const int DwmwaTransitionsForceDisabled = 3;
+
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    private static void SetWindowTransitions(Window window, bool enabled)
+    {
+        if (!OperatingSystem.IsWindows() || window.TryGetPlatformHandle()?.Handle is not { } hwnd || hwnd == IntPtr.Zero) return;
+        try
+        {
+            var disable = enabled ? 0 : 1;
+            DwmSetWindowAttribute(hwnd, DwmwaTransitionsForceDisabled, ref disable, sizeof(int));
+        }
+        catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException) { /* older Windows: keep the default animation */ }
+    }
 
     public Task RestoreAsync() => Dispatcher.UIThread.InvokeAsync(() =>
     {
         if (!_wasVisible || Main is not { } w) return;
+        SetWindowTransitions(w, enabled: true);
         w.Show();
         w.Activate();
         _wasVisible = false;

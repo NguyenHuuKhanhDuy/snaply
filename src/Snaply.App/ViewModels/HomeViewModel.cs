@@ -7,6 +7,22 @@ using Snaply.Core.Models;
 
 namespace Snaply.App.ViewModels;
 
+/// <summary>One line of the getting-started checklist. Completion is computed from real state, never stored as "seen".</summary>
+public sealed class OnboardingStep
+{
+    public OnboardingStep(string title, string description, bool isDone, string actionText, Action action)
+    {
+        Title = title; Description = description; IsDone = isDone; ActionText = actionText; Action = action;
+    }
+
+    public string Title { get; }
+    public string Description { get; }
+    public bool IsDone { get; }
+    public bool IsOpen => !IsDone;
+    public string ActionText { get; }
+    public Action Action { get; }
+}
+
 public sealed partial class HomeViewModel : ViewModelBase
 {
     private readonly CaptureCoordinator _capture;
@@ -17,24 +33,86 @@ public sealed partial class HomeViewModel : ViewModelBase
     private readonly NavigationHub _hub;
     private readonly LibraryEvents _events;
     private readonly Core.Services.HotkeyManager _hotkeys;
+    private readonly IOcrService _ocr;
 
     public HomeViewModel(CaptureCoordinator capture, IScreenshotRepository repo, IScreenshotLibrary library, IApplicationSettingsService settings,
-        IScreenCaptureService captureService, NavigationHub hub, LibraryEvents events, Core.Services.HotkeyManager hotkeys)
+        IScreenCaptureService captureService, NavigationHub hub, LibraryEvents events, Core.Services.HotkeyManager hotkeys, IOcrService ocr)
     {
         _capture = capture; _repo = repo; _library = library; _settings = settings; _captureService = captureService;
-        _hub = hub; _events = events; _hotkeys = hotkeys;
+        _hub = hub; _events = events; _hotkeys = hotkeys; _ocr = ocr;
         _events.Changed += () => { if (IsActive) _ = LoadAsync(); };
-        _hotkeys.StatusChanged += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => { OnPropertyChanged(nameof(RegionShortcut)); OnPropertyChanged(nameof(FullScreenShortcut)); OnPropertyChanged(nameof(ShortcutNote)); OnPropertyChanged(nameof(HasShortcutNote)); });
+        _hotkeys.StatusChanged += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(() => { OnPropertyChanged(nameof(RegionShortcut)); OnPropertyChanged(nameof(FullScreenShortcut)); OnPropertyChanged(nameof(ShortcutNote)); OnPropertyChanged(nameof(HasShortcutNote)); RefreshStatus(); });
     }
 
     public bool IsActive { get; set; }
+
+    /// <summary>Opens Settings scrolled to a section ("shortcuts", "ocr", ...). Set by the main view model.</summary>
+    public Action<string>? OpenSettingsSection { get; set; }
+
+    public ObservableCollection<OnboardingStep> Steps { get; } = new();
+    public ObservableCollection<string> ShortcutIssues { get; } = new();
+
+    [ObservableProperty] private bool _showChecklist;
+    [ObservableProperty] private string _checklistTitle = "";
+    public bool HasShortcutIssues => ShortcutIssues.Count > 0;
+
+    /// <summary>Recomputes the checklist and shortcut problems from real state (library, hotkey registrations, OCR data).</summary>
+    public void RefreshStatus()
+    {
+        var statuses = _hotkeys.Status;
+        var problems = new List<string>();
+        foreach (var (action, st) in statuses)
+        {
+            if (st.Status is HotkeyStatus.Conflict or HotkeyStatus.Failed)
+                problems.Add($"{ActionLabel(action)}: {st.Message ?? "could not be registered"}");
+        }
+        ShortcutIssues.Clear();
+        foreach (var p in problems) ShortcutIssues.Add(p);
+        OnPropertyChanged(nameof(HasShortcutIssues));
+
+        var shortcutsOk = _hotkeys.IsSupported && statuses.Count > 0 && statuses.Values.All(s => s.IsRegistered);
+        var steps = new List<OnboardingStep>
+        {
+            new("Take your first capture", "Use the buttons above or your shortcut. It appears in Recent.", TotalCount > 0, "Capture now", () => _ = _capture.CaptureRegionAsync()),
+            new("Check your keyboard shortcuts", _hotkeys.IsSupported
+                    ? (shortcutsOk ? "Your capture shortcuts are active." : "Some shortcuts could not be registered.")
+                    : "Global shortcuts are not available on this system.",
+                shortcutsOk, "Open shortcuts", () => OpenSettingsSection?.Invoke("shortcuts")),
+            new("Set up text recognition", _ocr.IsAvailable ? "OCR language data was found." : "Add language data so Snaply can read text in screenshots.",
+                _ocr.IsAvailable, "Open OCR settings", () => OpenSettingsSection?.Invoke("ocr")),
+        };
+
+        Steps.Clear();
+        foreach (var s in steps) Steps.Add(s);
+        var done = steps.Count(s => s.IsDone);
+        ChecklistTitle = $"Get started · {done} of {steps.Count} done";
+        ShowChecklist = Loaded && !_settings.Current.OnboardingDismissed && done < steps.Count;
+    }
+
+    private static string ActionLabel(string action) => action switch
+    {
+        HotkeyActions.CaptureRegion => "Capture region",
+        HotkeyActions.CaptureFullScreen => "Capture full screen",
+        HotkeyActions.OpenApp => "Open Snaply",
+        _ => action,
+    };
+
+    [RelayCommand]
+    private async Task DismissChecklistAsync()
+    {
+        await _settings.UpdateAsync(s => s.OnboardingDismissed = true).ConfigureAwait(true);
+        RefreshStatus();
+    }
+
+    [RelayCommand] private void RunStep(OnboardingStep? step) => step?.Action();
+    [RelayCommand] private void FixShortcuts() => OpenSettingsSection?.Invoke("shortcuts");
     public Action<NavDestination>? NavigateTo { get; set; }
 
     public ObservableCollection<ScreenshotItemViewModel> Recent { get; } = new();
 
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasRecent), nameof(ShowEmpty))] private int _recentCount;
     [ObservableProperty] private int _totalCount;
-    [ObservableProperty] private bool _loaded;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowEmpty))] private bool _loaded;
 
     public bool HasRecent => RecentCount > 0;
     public bool ShowEmpty => Loaded && RecentCount == 0;
@@ -76,6 +154,7 @@ public sealed partial class HomeViewModel : ViewModelBase
         RecentCount = page.Count;
         Loaded = true;
         OnPropertyChanged(nameof(CanRepeat));
+        RefreshStatus();
     }
 
     [RelayCommand] private Task CaptureRegionAsync() => _capture.CaptureRegionAsync();

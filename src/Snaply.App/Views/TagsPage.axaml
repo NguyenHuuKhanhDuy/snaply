@@ -8,7 +8,7 @@
   <Grid>
     <c:EmptyState IsVisible="{Binding ShowNoTags}" Icon="{DynamicResource IconTag}" Title="No tags yet"
                   Description="Tag screenshots from their details panel in All Screenshots to group them here." />
-    <Grid ColumnDefinitions="260,*" IsVisible="{Binding !ShowNoTags}">
+    <Grid x:Name="TagsGrid" ColumnDefinitions="260,*" IsVisible="{Binding !ShowNoTags}">
       <Border Background="{DynamicResource BackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
         <Grid RowDefinitions="Auto,*" Margin="16,24,12,16">
           <TextBlock Text="Tags" Classes="title" Margin="8,0,0,14" />

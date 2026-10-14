@@ -50,6 +50,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         _home = services.GetRequiredService<HomeViewModel>();
         _home.NavigateTo = Navigate;
+        _home.OpenSettingsSection = section => Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = OpenSettingsAtAsync(section));
         _all = services.GetRequiredService<GalleryViewModel>();
         _all.Configure(GalleryMode.All, "All Screenshots");
         _favorites = services.GetRequiredService<GalleryViewModel>();
@@ -169,11 +170,13 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand] private void ToggleSidebar() => IsSidebarCollapsed = !IsSidebarCollapsed;
     // Opens Settings scrolled to the Updates section (used by the version label in the sidebar).
     [RelayCommand]
-    private async Task OpenSettingsAsync()
+    private Task OpenSettingsAsync() => OpenSettingsAtAsync("updates");
+
+    public async Task OpenSettingsAtAsync(string section)
     {
-        _settings.RequestScroll("updates");
+        _settings.RequestScroll(section);
         await NavigateAsync(NavDestination.Settings);
-        _settings.RequestScroll("updates");
+        _settings.RequestScroll(section);
     }
     [RelayCommand] private Task CaptureRegionAsync() => _capture.CaptureRegionAsync();
     [RelayCommand] private Task CaptureFullScreenAsync() => _capture.CaptureFullScreenAsync();

@@ -9,3 +9,5 @@ public enum CaptureMode { Region, FullScreen }
 public enum CaptureMethod { Region, FullScreen, Window, Import, Edited }
 
 public enum MonitorTarget { UnderCursor, AllMonitors }
+
+public enum GalleryViewMode { Grid, List }

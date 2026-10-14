@@ -6,13 +6,16 @@ namespace Snaply.Infrastructure.Storage;
 /// <summary>Generates small cached JPEG thumbnails, decoding at reduced size where the codec supports it.</summary>
 public sealed class ThumbnailService
 {
-    public const int MaxEdge = 320;
+    public const int MaxEdge = 640;
+    /// <summary>Bumped whenever thumbnail size/quality changes; older thumbnails are regenerated on demand.</summary>
+    public const string Suffix = ".thumb2.jpg";
+    public static bool IsCurrent(string? thumbnailPath) => thumbnailPath is not null && thumbnailPath.EndsWith(Suffix, StringComparison.OrdinalIgnoreCase);
     private readonly AppPaths _paths;
 
     public ThumbnailService(AppPaths paths) => _paths = paths;
 
     public static string ThumbnailFileNameFor(string imagePath) =>
-        Path.GetFileNameWithoutExtension(imagePath) + ".thumb.jpg";
+        Path.GetFileNameWithoutExtension(imagePath) + Suffix;
 
     public Task<Result<string>> GenerateAsync(string imagePath, CancellationToken ct = default) =>
         Task.Run(() => Generate(imagePath, ct), ct);
@@ -40,7 +43,7 @@ public sealed class ThumbnailService
             var th = Math.Max(1, (int)Math.Round(h * scale));
             using var thumb = decoded.Width == tw && decoded.Height == th
                 ? decoded.Copy()
-                : decoded.Resize(new SKImageInfo(tw, th, SKColorType.Bgra8888, SKAlphaType.Premul), SKFilterQuality.Medium);
+                : decoded.Resize(new SKImageInfo(tw, th, SKColorType.Bgra8888, SKAlphaType.Premul), SKFilterQuality.High);
 
             // Flatten transparency onto white so JPEG thumbnails of transparent images don't turn black.
             using var flat = new SKBitmap(tw, th, SKColorType.Bgra8888, SKAlphaType.Opaque);
@@ -50,7 +53,7 @@ public sealed class ThumbnailService
                 canvas.DrawBitmap(thumb, 0, 0);
             }
             using var img = SKImage.FromBitmap(flat);
-            using var data = img.Encode(SKEncodedImageFormat.Jpeg, 85);
+            using var data = img.Encode(SKEncodedImageFormat.Jpeg, 92);
 
             var final = Path.Combine(_paths.ThumbnailsDirectory, ThumbnailFileNameFor(imagePath));
             temp = final + ".tmp";

@@ -95,7 +95,22 @@ public sealed class TesseractOcrService : IOcrService
                 } while (it.Next(PageIteratorLevel.TextLine));
             }
 
-            return Result<OcrResult>.Ok(new OcrResult(text, blocks, langCode, EngineName));
+            var words = new List<OcrWord>();
+            using (var it = page.GetIterator())
+            {
+                it.Begin();
+                var line = -1;
+                do
+                {
+                    if (it.IsAtBeginningOf(PageIteratorLevel.TextLine)) line++;
+                    var word = it.GetText(PageIteratorLevel.Word)?.Trim();
+                    if (string.IsNullOrEmpty(word)) continue;
+                    if (it.TryGetBoundingBox(PageIteratorLevel.Word, out var r) && r.Width > 0 && r.Height > 0)
+                        words.Add(new OcrWord(word, r.X1, r.Y1, r.Width, r.Height, it.GetConfidence(PageIteratorLevel.Word) / 100f, Math.Max(0, line)));
+                } while (it.Next(PageIteratorLevel.Word));
+            }
+
+            return Result<OcrResult>.Ok(new OcrResult(text, blocks, langCode, EngineName, words));
         }
         catch (Exception ex) when (ex is DllNotFoundException or BadImageFormatException or TesseractException or IOException or AccessViolationException or InvalidOperationException or ArgumentException)
         {

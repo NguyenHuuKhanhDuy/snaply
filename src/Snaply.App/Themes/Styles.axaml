@@ -113,12 +113,12 @@
   <Style Selector="Button.secondary">
     <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
   </Style>
   <Style Selector="Button.secondary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
   </Style>
   <Style Selector="Button.secondary:pressed /template/ ContentPresenter#PART_ContentPresenter">
@@ -236,7 +236,7 @@
   <Style Selector="ToggleButton.segment:checked /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
   </Style>
   <Style Selector="ToggleButton.segment:checked c|Icon">
@@ -250,7 +250,7 @@
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusSm}" />
     <Setter Property="MinHeight" Value="34" />
     <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
   </Style>
   <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
@@ -287,12 +287,63 @@
     <Setter Property="Cursor" Value="Hand" />
   </Style>
   <Style Selector="Button.tile:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
     <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
   </Style>
   <Style Selector="Button.tile.selected /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
     <Setter Property="BorderThickness" Value="2" />
     <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+  </Style>
+
+  <!-- Disabled buttons: quiet, not a heavy grey block -->
+  <Style Selector="Button.secondary:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="Button.secondary:disabled c|Icon">
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource TextTertiaryBrush}" />
+  </Style>
+
+  <!-- Visible keyboard focus on every button kind -->
+  <Style Selector="Button:focus-visible /template/ ContentPresenter#PART_ContentPresenter, ToggleButton:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="CheckBox:focus-visible /template/ Border#NormalRectangle, ToggleSwitch:focus-visible /template/ Border#SwitchKnobBounds">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  </Style>
+
+  <!-- Drop-downs follow the same surface / border tokens as our inputs -->
+  <Style Selector="ComboBox">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Style.Resources>
+      <SolidColorBrush x:Key="ComboBoxBackground" Color="{DynamicResource SurfaceColor}" />
+      <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="{DynamicResource SurfaceHoverColor}" />
+      <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="{DynamicResource SurfaceAltColor}" />
+      <SolidColorBrush x:Key="ComboBoxBackgroundFocused" Color="{DynamicResource SurfaceColor}" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="{DynamicResource ControlBorderColor}" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="{DynamicResource ControlBorderColor}" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="{DynamicResource AccentColor}" />
+      <SolidColorBrush x:Key="ComboBoxBorderBrushFocused" Color="{DynamicResource AccentColor}" />
+      <SolidColorBrush x:Key="ComboBoxForeground" Color="{DynamicResource TextPrimaryColor}" />
+      <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="{DynamicResource SurfaceColor}" />
+      <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="{DynamicResource BorderStrongColor}" />
+    </Style.Resources>
+  </Style>
+
+  <!-- Gallery multi-select and keyboard cursor -->
+  <Style Selector="Button.tile.focused /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="Button.tile.checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SelectionBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderThickness" Value="2" />
   </Style>
 </Styles>

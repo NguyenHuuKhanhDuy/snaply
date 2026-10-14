@@ -154,36 +154,7 @@ public partial class App : Application
         s.AddSnaplyInfrastructure(paths);
         s.AddSnaplyPlatform();
 
-        s.AddSingleton<NotificationService>();
-        s.AddSingleton<INotificationService>(p => p.GetRequiredService<NotificationService>());
-        s.AddSingleton<DialogService>();
-        s.AddSingleton<IDialogService>(p => p.GetRequiredService<DialogService>());
-        s.AddSingleton<ThemeService>();
-        s.AddSingleton<LibraryEvents>();
-        s.AddSingleton<NavigationHub>();
-        s.AddSingleton<IAppWindowController, AppWindowController>();
-        s.AddSingleton<IRegionSelector, RegionSelector>();
-        s.AddSingleton<CaptureOrchestrator>();
-        s.AddSingleton<CaptureCoordinator>();
-        s.AddSingleton<HotkeyManager>();
-        s.AddSingleton<IAppUpdateService, VelopackUpdateService>();
-        s.AddSingleton<UpdateCoordinator>();
-        s.AddSingleton<UpdateBannerViewModel>();
-        s.AddSingleton<ScreenshotActions>();
-
-        s.AddSingleton<IOcrService>(p => new TesseractOcrService(
-            new[] { paths.TessdataDirectory, Path.Combine(AppContext.BaseDirectory, "tessdata"), Environment.GetEnvironmentVariable("TESSDATA_PREFIX") ?? "" },
-            p.GetRequiredService<ILogger<TesseractOcrService>>()));
-        s.AddSingleton<OcrWorkflow>();
-
-        s.AddSingleton<MainViewModel>();
-        s.AddSingleton<HomeViewModel>();
-        s.AddSingleton<TagsViewModel>();
-        s.AddSingleton<SettingsViewModel>();
-        s.AddTransient<GalleryViewModel>();
-        s.AddTransient<DetailsViewModel>();
-        s.AddTransient<OcrPanelViewModel>();
-        s.AddTransient<EditorViewModel>();
+        s.AddSnaplyApplication(paths);
 
         return s.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = false, ValidateScopes = false });
     }

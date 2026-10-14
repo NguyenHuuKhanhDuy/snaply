@@ -36,6 +36,8 @@ public static class Colors
     public const uint Blue = 0xFF3B82F6;
     public const uint Black = 0xFF111111;
     public const uint White = 0xFFFFFFFF;
+    /// <summary>Default fill of a redaction box: pure black.</summary>
+    public const uint RedactFill = 0xFF000000;
     public static readonly uint[] Palette = { Red, Yellow, Green, Blue, Black, White };
 }
 
@@ -197,6 +199,18 @@ public abstract record RedactionAnnotation : Annotation
 {
     public DocRect Rect { get; init; }
     public override DocRect Bounds => Rect;
+}
+
+/// <summary>
+/// A solid cover for sensitive content. It is always drawn fully opaque (alpha is forced to 255 when rendering), has no strength
+/// to undo, and every export flattens it, so the covered pixels are not present in the produced file.
+/// </summary>
+public sealed record RedactAnnotation : RedactionAnnotation
+{
+    public uint Color { get; init; } = Colors.RedactFill;
+    public override string Kind => "redact";
+    public override Annotation Translated(float dx, float dy) => this with { Rect = Rect.Translate(dx, dy) };
+    public override Annotation Resized(DocRect bounds) => this with { Rect = bounds };
 }
 
 public sealed record BlurAnnotation : RedactionAnnotation

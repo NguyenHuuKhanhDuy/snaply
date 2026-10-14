@@ -114,6 +114,7 @@ public static class DocumentSerializer
             case HighlightAnnotation h: d.Rect = ToDto(h.Rect); d.Color = h.Color; break;
             case TextAnnotation t: d.X1 = t.Position.X; d.Y1 = t.Position.Y; d.Text = t.Text; d.Color = t.Color; d.FontSize = t.FontSize; break;
             case NumberedStepAnnotation n: d.X1 = n.Center.X; d.Y1 = n.Center.Y; d.Number = n.Number; d.Size = n.Diameter; d.Color = n.Color; d.Stroke = n.StrokeWidth; break;
+            case RedactAnnotation red: d.Rect = ToDto(red.Rect); d.Color = red.Color; break;
             case BlurAnnotation bl: d.Rect = ToDto(bl.Rect); d.Size = bl.Radius; break;
             case PixelateAnnotation p: d.Rect = ToDto(p.Rect); d.Size = p.BlockSize; break;
             default: throw new NotSupportedException($"Unknown annotation type {a.GetType().Name}");
@@ -134,6 +135,7 @@ public static class DocumentSerializer
             "highlight" => new HighlightAnnotation { Id = id, Rect = rect, Color = d.Color },
             "text" => new TextAnnotation { Id = id, Position = new(d.X1, d.Y1), Text = d.Text ?? "", Color = d.Color, FontSize = d.FontSize <= 0 ? 28 : d.FontSize },
             "step" => new NumberedStepAnnotation { Id = id, Center = new(d.X1, d.Y1), Number = d.Number, Diameter = d.Size <= 0 ? 40 : d.Size, Color = d.Color, StrokeWidth = d.Stroke },
+            "redact" => new RedactAnnotation { Id = id, Rect = rect, Color = (d.Color == 0 ? Colors.RedactFill : d.Color) | 0xFF000000u },
             "blur" => new BlurAnnotation { Id = id, Rect = rect, Radius = d.Size <= 0 ? 12 : d.Size },
             "pixelate" => new PixelateAnnotation { Id = id, Rect = rect, BlockSize = d.Size <= 0 ? 12 : (int)d.Size },
             _ => null,

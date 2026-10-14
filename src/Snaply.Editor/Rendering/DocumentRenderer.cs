@@ -60,6 +60,9 @@ public static class DocumentRenderer
             case NumberedStepAnnotation n:
                 DrawStep(canvas, n);
                 break;
+            case RedactAnnotation red:
+                DrawRedact(canvas, red);
+                break;
             case BlurAnnotation bl:
                 DrawBlur(canvas, surface, bl);
                 break;
@@ -131,6 +134,21 @@ public static class DocumentRenderer
         var w = paint.MeasureText(label);
         var m = font.Metrics;
         canvas.DrawText(label, n.Center.X - w / 2, n.Center.Y - (m.Ascent + m.Descent) / 2, font, paint);
+    }
+
+    /// <summary>Opaque fill, snapped outward to whole device pixels with no anti-aliasing, so no edge pixel keeps a trace of the original.</summary>
+    private static void DrawRedact(SKCanvas canvas, RedactAnnotation r)
+    {
+        var rect = r.Rect.ToSk();
+        if (rect.Width <= 0 || rect.Height <= 0) return;
+        var device = canvas.TotalMatrix.MapRect(rect);
+        var snapped = new SKRect((float)Math.Floor(device.Left), (float)Math.Floor(device.Top), (float)Math.Ceiling(device.Right), (float)Math.Ceiling(device.Bottom));
+
+        canvas.Save();
+        canvas.ResetMatrix();
+        using var paint = new SKPaint { Style = SKPaintStyle.Fill, IsAntialias = false, Color = new SKColor(r.Color | 0xFF000000u), BlendMode = SKBlendMode.Src };
+        canvas.DrawRect(snapped, paint);
+        canvas.Restore();
     }
 
     private static void DrawBlur(SKCanvas canvas, SKSurface surface, BlurAnnotation b)

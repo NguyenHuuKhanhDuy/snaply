@@ -514,12 +514,27 @@ public class LibraryTests
     }
 
     [Fact]
+    public async Task Old_low_resolution_thumbnails_are_regenerated_on_demand()
+    {
+        using var env = new TestEnv();
+        var s = (await env.Library.AddAsync(TestEnv.Image(1600, 800), CaptureMethod.Region)).Value;
+        var old = Path.Combine(env.Paths.ThumbnailsDirectory, "legacy.thumb.jpg");
+        File.Copy(s.ThumbnailPath!, old);
+        s.ThumbnailPath = old;
+
+        Assert.True((await env.Library.EnsureThumbnailAsync(s)).IsSuccess);
+
+        Assert.True(ThumbnailService.IsCurrent(s.ThumbnailPath));
+        Assert.False(File.Exists(old));
+    }
+
+    [Fact]
     public async Task Thumbnails_are_bounded_to_max_edge_preserving_aspect()
     {
         using var env = new TestEnv();
         var s = (await env.Library.AddAsync(TestEnv.Image(1600, 800), CaptureMethod.Region)).Value;
         var (w, h) = ImageCodec.ReadSize(s.ThumbnailPath!)!.Value;
-        Assert.Equal((320, 160), (w, h));
+        Assert.Equal((640, 320), (w, h));
     }
 
     [Fact]

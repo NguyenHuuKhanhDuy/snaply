@@ -4,15 +4,56 @@
              xmlns:c="using:Snaply.App.Controls"
              x:Class="Snaply.App.Views.SettingsPage"
              x:DataType="vm:SettingsViewModel">
-  <ScrollViewer x:Name="SettingsScroll" HorizontalScrollBarVisibility="Disabled">
-    <StackPanel x:Name="SettingsContent" MaxWidth="820" Margin="32,28,32,40" Spacing="28" HorizontalAlignment="Stretch">
-      <StackPanel Spacing="4">
+  <Grid RowDefinitions="Auto,*">
+    <!-- Header: title, search and (narrow windows) a section picker -->
+    <Grid Margin="32,24,32,10" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+      <StackPanel Spacing="4" VerticalAlignment="Center">
         <TextBlock Text="Settings" Classes="title" />
         <TextBlock Text="Changes are saved automatically." Classes="secondary" />
       </StackPanel>
+      <ComboBox x:Name="SectionPicker" Grid.Column="1" ItemsSource="{Binding Sections}" MinWidth="150" IsVisible="False" VerticalAlignment="Center"
+                AutomationProperties.Name="Jump to section">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:SettingsSectionItem"><TextBlock Text="{Binding Title}" /></DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+      <TextBox x:Name="SettingsSearch" Grid.Column="2" Width="260" Watermark="Search settings" VerticalAlignment="Center" AutomationProperties.Name="Search settings">
+        <TextBox.InnerLeftContent>
+          <c:Icon Data="{DynamicResource IconSearch}" Size="16" Margin="10,0,0,0" VerticalAlignment="Center" />
+        </TextBox.InnerLeftContent>
+        <TextBox.InnerRightContent>
+          <Button x:Name="ClearSearch" Classes="icon" Width="26" Height="26" Margin="0,0,4,0" IsVisible="False" ToolTip.Tip="Clear search" AutomationProperties.Name="Clear search">
+            <c:Icon Data="{DynamicResource IconClose}" Size="13" />
+          </Button>
+        </TextBox.InnerRightContent>
+      </TextBox>
+    </Grid>
+
+    <Grid Grid.Row="1" ColumnDefinitions="Auto,*">
+      <!-- Section list (wide windows) -->
+      <Border x:Name="SectionNav" Width="220" Padding="20,8,8,16" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+        <ItemsControl ItemsSource="{Binding Sections}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SettingsSectionItem">
+              <Button Classes="nav" Classes.active="{Binding IsActive}" IsVisible="{Binding IsVisible}"
+                      Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).GoToSectionCommand}" CommandParameter="{Binding Key}"
+                      AutomationProperties.Name="{Binding Title}">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                  <c:Icon Data="{Binding Icon}" Size="17" />
+                  <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Border>
+
+  <ScrollViewer x:Name="SettingsScroll" Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel x:Name="SettingsContent" MaxWidth="820" Margin="28,8,32,40" Spacing="28" HorizontalAlignment="Left">
 
       <!-- Appearance -->
-      <c:SectionCard Title="Appearance" Description="Choose how Snaply looks. System follows your operating system.">
+      <c:SectionCard x:Name="AppearanceSection" Title="Appearance" Description="Choose how Snaply looks. System follows your operating system.">
         <StackPanel>
           <c:SettingsRow Title="Theme">
             <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="8" Padding="3">
@@ -41,7 +82,7 @@
       </c:SectionCard>
 
       <!-- Capture -->
-      <c:SectionCard Title="Capture" Description="What happens after you take a screenshot.">
+      <c:SectionCard x:Name="CaptureSection" Title="Capture" Description="What happens after you take a screenshot.">
         <StackPanel>
           <c:SettingsRow Title="Save location" Description="{Binding SaveDirectory}">
             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -59,8 +100,14 @@
             <ToggleSwitch IsChecked="{Binding SaveToLibrary}" OnContent="" OffContent="" AutomationProperties.Name="Save captures to library" />
           </c:SettingsRow>
           <Border Classes="divider" />
-          <c:SettingsRow Title="Edit right after selecting" Description="Annotate the chosen area on the capture overlay (arrows, text, blur…) like Lightshot, without opening the editor.">
+          <c:SettingsRow Title="Edit right after selecting" Description="Annotate the chosen area on the capture overlay (arrows, text, blur…) without opening the editor.">
             <ToggleSwitch IsChecked="{Binding EditAfterSelection}" OnContent="" OffContent="" AutomationProperties.Name="Edit on the capture overlay" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Default tool" Description="The tool that is already active when you finish selecting an area. Pick Select to start without one.">
+            <ComboBox ItemsSource="{x:Static vm:SettingsViewModel.DefaultToolOptions}" SelectedItem="{Binding DefaultTool}" MinWidth="150" AutomationProperties.Name="Default capture tool">
+              <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:ToolChoice"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate>
+            </ComboBox>
           </c:SettingsRow>
           <Border Classes="divider" />
           <c:SettingsRow Title="Copy to clipboard" Description="Also place each capture on the clipboard.">
@@ -86,7 +133,7 @@
       </c:SectionCard>
 
       <!-- Shortcuts -->
-      <c:SectionCard Title="Keyboard shortcuts" Description="Global shortcuts work while Snaply runs in the background. Press Esc to cancel while recording.">
+      <c:SectionCard x:Name="ShortcutsSection" Title="Keyboard shortcuts" Description="Global shortcuts work while Snaply runs in the background. Press Esc to cancel while recording.">
         <StackPanel>
           <Border Background="{DynamicResource WarningSoftBrush}" CornerRadius="8" Padding="14,12" Margin="0,10,0,6" IsVisible="{Binding HasShortcutBanner}">
             <StackPanel Orientation="Horizontal" Spacing="12">
@@ -134,9 +181,9 @@
       </c:SectionCard>
 
       <!-- OCR -->
-      <c:SectionCard Title="Text recognition (OCR)" Description="Runs entirely on this device. Nothing is uploaded.">
+      <c:SectionCard x:Name="OcrSection" Title="Text recognition (OCR)" Description="Runs entirely on this device. Nothing is uploaded.">
         <StackPanel>
-          <c:SettingsRow Title="Engine" Description="{Binding OcrEngineText}" />
+          <c:SettingsRow Title="Status" Description="{Binding OcrEngineText}" />
           <Border Background="{DynamicResource WarningSoftBrush}" CornerRadius="8" Padding="14,12" Margin="0,0,0,10" IsVisible="{Binding HasOcrNotice}">
             <TextBlock Text="{Binding OcrNotice}" TextWrapping="Wrap" Classes="caption" />
           </Border>
@@ -159,8 +206,21 @@
         </StackPanel>
       </c:SectionCard>
 
+      <!-- Redaction -->
+      <c:SectionCard x:Name="RedactionSection" Title="Redaction" Description="Choose what “Find sensitive info” looks for in the editor. Suggestions are only a help: nothing is covered until you choose, and text recognition can miss things.">
+        <StackPanel Margin="0,6" Spacing="2">
+          <ItemsControl ItemsSource="{Binding RedactionRules}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:RedactionRuleRow">
+                <CheckBox Content="{Binding Name}" IsChecked="{Binding IsEnabled}" AutomationProperties.Name="{Binding Name}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </c:SectionCard>
+
       <!-- Storage -->
-      <c:SectionCard Title="Storage" Description="Your screenshots stay in these folders on your device.">
+      <c:SectionCard x:Name="StorageSection" Title="Storage" Description="Your screenshots stay in these folders on your device.">
         <StackPanel>
           <c:SettingsRow Title="Screenshots" Description="{Binding SaveDirectory}">
             <Button Classes="secondary" Content="Open folder" Command="{Binding OpenScreenshotFolderCommand}" />
@@ -193,7 +253,7 @@
       </c:SectionCard>
 
       <!-- Updates -->
-      <c:SectionCard x:Name="UpdatesSection" Title="Updates" Description="Snaply checks the public GitHub release list. No screenshots or personal data are sent.">
+      <c:SectionCard x:Name="UpdatesSection" Title="Updates" Description="Snaply checks online for new versions. No screenshots or personal data are sent.">
         <StackPanel DataContext="{Binding Updates}" x:DataType="vm:UpdateBannerViewModel">
           <c:SettingsRow Title="Current version" Description="{Binding LastCheckedText}">
             <TextBlock Text="{Binding CurrentVersion}" FontWeight="Medium" />
@@ -214,7 +274,7 @@
       </c:SectionCard>
 
       <!-- About -->
-      <c:SectionCard Title="About">
+      <c:SectionCard x:Name="AboutSection" Title="About">
         <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="24" RowSpacing="8" Margin="0,12">
           <TextBlock Text="Version" Classes="secondary" />
           <TextBlock Grid.Column="1" Text="{Binding Version}" />
@@ -228,6 +288,12 @@
           <TextBlock Grid.Row="4" Grid.Column="1" Text="README.md and the docs/ folder in the Snaply source repository." TextWrapping="Wrap" />
         </Grid>
       </c:SectionCard>
+      <c:EmptyState x:Name="NoResults" IsVisible="False" Icon="{DynamicResource IconSearch}" Title="No settings match your search"
+                    Description="Try a different word, or clear the search to see every setting." Margin="0,60">
+        <Button x:Name="NoResultsClear" Classes="secondary" Content="Clear search" />
+      </c:EmptyState>
     </StackPanel>
   </ScrollViewer>
+    </Grid>
+  </Grid>
 </UserControl>

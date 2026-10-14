@@ -21,16 +21,13 @@ public partial class EditorPage : UserControl
         canvas.TextRequested += OnTextRequested;
         AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
         AttachedToVisualTree += (_, _) => Focus();
+        PropertyChanged += (_, e) => { if (e.Property == BoundsProperty) Classes.Set("compact", Bounds.Width < 880); };
     }
 
     private EditorViewModel? Vm => DataContext as EditorViewModel;
 
-    private static readonly Dictionary<Key, EditorTool> ToolKeys = new()
-    {
-        [Key.V] = EditorTool.Select, [Key.C] = EditorTool.Crop, [Key.R] = EditorTool.Rectangle, [Key.O] = EditorTool.Ellipse,
-        [Key.A] = EditorTool.Arrow, [Key.T] = EditorTool.Text, [Key.H] = EditorTool.Highlight, [Key.N] = EditorTool.Step,
-        [Key.B] = EditorTool.Blur, [Key.P] = EditorTool.Pixelate,
-    };
+    private static readonly Dictionary<Key, EditorTool> ToolKeys = Snaply.Editor.Model.AnnotationToolset.Tools
+        .ToDictionary(t => Enum.Parse<Key>(t.Shortcut.ToString()), t => Enum.Parse<EditorTool>(t.Kind.ToString()));
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {

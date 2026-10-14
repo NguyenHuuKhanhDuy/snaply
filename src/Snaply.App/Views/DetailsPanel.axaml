@@ -27,7 +27,7 @@
 
       <Grid ColumnDefinitions="*,Auto">
         <StackPanel Spacing="2">
-          <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding FileName}" />
           <TextBlock Text="{Binding CreatedText}" Classes="caption secondary" />
         </StackPanel>
         <ToggleButton Grid.Column="1" Classes="icon" IsChecked="{Binding IsFavorite, Mode=OneWay}" Command="{Binding ToggleFavoriteCommand}" VerticalAlignment="Top"
@@ -72,7 +72,12 @@
         <TextBlock Grid.Row="2" Text="Format" Classes="caption secondary" />
         <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding FormatText}" Classes="caption" />
         <TextBlock Grid.Row="3" Text="Location" Classes="caption secondary" />
-        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding PathText}" Classes="caption" TextWrapping="Wrap" />
+        <Grid Grid.Row="3" Grid.Column="1" ColumnDefinitions="*,Auto">
+          <TextBlock Text="{Binding PathText}" Classes="caption" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding PathText}" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="icon" Width="24" Height="24" Margin="6,0,0,0" Command="{Binding CopyPathCommand}" ToolTip.Tip="Copy path" AutomationProperties.Name="Copy file path">
+            <c:Icon Data="{DynamicResource IconCopy}" Size="13" />
+          </Button>
+        </Grid>
       </Grid>
 
       <!-- Tags -->

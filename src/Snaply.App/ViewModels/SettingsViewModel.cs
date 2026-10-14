@@ -55,6 +55,35 @@ public sealed partial class OcrLanguageRow : ObservableObject
     partial void OnIsSelectedChanged(bool value) => _owner.OnLanguageToggled();
 }
 
+/// <summary>One kind of sensitive data the redaction scan can look for; turning it off removes it from suggestions.</summary>
+public sealed partial class RedactionRuleRow : ObservableObject
+{
+    private readonly SettingsViewModel _owner;
+    public RedactionRuleRow(SettingsViewModel owner, Snaply.Core.Redaction.SensitiveType type, bool enabled)
+    {
+        _owner = owner; Type = type; _isEnabled = enabled;
+    }
+    public Snaply.Core.Redaction.SensitiveType Type { get; }
+    public string Name => Snaply.Core.Redaction.SensitiveText.Label(Type);
+    [ObservableProperty] private bool _isEnabled;
+    partial void OnIsEnabledChanged(bool value) => _owner.OnRedactionRuleToggled();
+}
+
+public sealed partial class SettingsSectionItem : ObservableObject
+{
+    public SettingsSectionItem(string key, string title, string iconKey)
+    {
+        Key = key; Title = title;
+        Icon = (Avalonia.Media.Geometry)Avalonia.Controls.ResourceNodeExtensions.FindResource(Avalonia.Application.Current!, iconKey)!;
+    }
+
+    public string Key { get; }
+    public string Title { get; }
+    public Avalonia.Media.Geometry Icon { get; }
+    [ObservableProperty] private bool _isActive;
+    [ObservableProperty] private bool _isVisible = true;
+}
+
 public sealed partial class SettingsViewModel : ViewModelBase
 {
     private readonly IApplicationSettingsService _settings;
@@ -78,6 +107,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         _settings = settings; _theme = theme; _dialogs = dialogs; _notes = notes; _hotkeys = hotkeys; _library = library; _repo = repo;
         _ocr = ocr; _capture = capture; _shell = shell; _paths = paths; _events = events;
         Updates = updates;
+        BuildSections();
 
         Shortcuts = new ObservableCollection<ShortcutRowViewModel>
         {
@@ -93,8 +123,39 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     /// <summary>Asks the settings page to scroll a section to the top ("updates"). Pending until the page is on screen.</summary>
     public string? PendingScroll { get; set; }
+
+    public ObservableCollection<SettingsSectionItem> Sections { get; } = new();
+    [ObservableProperty] private string _activeSection = "appearance";
+
+    private void BuildSections()
+    {
+        Sections.Add(new("appearance", "Appearance", "IconSun"));
+        Sections.Add(new("capture", "Capture", "IconCapture"));
+        Sections.Add(new("shortcuts", "Shortcuts", "IconKeyboard"));
+        Sections.Add(new("ocr", "Text recognition", "IconOcr"));
+        Sections.Add(new("redaction", "Redaction", "IconShield"));
+        Sections.Add(new("storage", "Storage", "IconFolder"));
+        Sections.Add(new("updates", "Updates", "IconRefresh"));
+        Sections.Add(new("about", "About", "IconInfo"));
+        SetActiveSection("appearance");
+    }
+
+    /// <summary>Highlights a section in the list (called when the user scrolls or picks one).</summary>
+    public void SetActiveSection(string key)
+    {
+        ActiveSection = key;
+        foreach (var s in Sections) s.IsActive = s.Key == key;
+    }
+
+    [RelayCommand]
+    private void GoToSection(string? key)
+    {
+        if (key is null) return;
+        SetActiveSection(key);
+        RequestScroll(key);
+    }
     public event Action? ScrollRequested;
-    public void RequestScroll(string section) { PendingScroll = section; ScrollRequested?.Invoke(); }
+    public void RequestScroll(string section) { PendingScroll = section; SetActiveSection(section); ScrollRequested?.Invoke(); }
 
     public IReadOnlyList<int> DelayOptions { get; } = new[] { 0, 3, 5, 10 };
     public IReadOnlyList<string> FormatOptions { get; } = new[] { "PNG (lossless)", "JPEG (smaller)" };
@@ -130,6 +191,22 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string? _ocrNotice;
     [ObservableProperty] private bool _hasOcrNotice;
     [ObservableProperty] private string _tessdataPath = "";
+
+    public ObservableCollection<RedactionRuleRow> RedactionRules { get; } = new();
+
+    internal void OnRedactionRuleToggled()
+    {
+        if (_loading) return;
+        var off = RedactionRules.Where(r => !r.IsEnabled).Select(r => r.Type.ToString()).ToList();
+        _ = ApplyAsync(s => s.DisabledRedactionTypes = off);
+    }
+
+    /// <summary>Tools that can be preselected on the capture overlay, from the shared tool definition.</summary>
+    public static IReadOnlyList<ToolChoice> DefaultToolOptions { get; } = Snaply.Editor.Model.AnnotationToolset.Tools
+        .Where(t => t.InOverlay)
+        .Select(t => new ToolChoice(t.Kind.ToString(), t.Kind == Snaply.Editor.Model.AnnotationToolKind.Select ? "Select (none)" : t.Name))
+        .ToList();
+    [ObservableProperty] private ToolChoice _defaultTool = DefaultToolOptions[0];
 
     // Storage
     [ObservableProperty] private string _storageSummary = "Calculating…";
@@ -172,8 +249,12 @@ public sealed partial class SettingsViewModel : ViewModelBase
             EditAfterSelection = s.EditAfterSelection;
             CopyToClipboard = s.CopyToClipboardAfterCapture;
             OpenEditorAfter = s.OpenEditorAfterCapture;
+            DefaultTool = DefaultToolOptions.FirstOrDefault(t => t.Key == s.DefaultCaptureTool) ?? DefaultToolOptions[0];
             AllMonitors = s.FullScreenTarget == MonitorTarget.AllMonitors;
             DelaySeconds = s.CaptureDelaySeconds;
+            RedactionRules.Clear();
+            foreach (var type in Enum.GetValues<Snaply.Core.Redaction.SensitiveType>())
+                RedactionRules.Add(new RedactionRuleRow(this, type, !s.DisabledRedactionTypes.Contains(type.ToString())));
 
             foreach (var row in Shortcuts) row.Gesture = s.Hotkeys.GetValueOrDefault(row.Action, "");
             RefreshShortcutStatus();
@@ -236,6 +317,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     partial void OnCopyToClipboardChanged(bool value) => _ = ApplyAsync(s => s.CopyToClipboardAfterCapture = value);
     partial void OnOpenEditorAfterChanged(bool value) => _ = ApplyAsync(s => s.OpenEditorAfterCapture = value);
     partial void OnAllMonitorsChanged(bool value) => _ = ApplyAsync(s => s.FullScreenTarget = value ? MonitorTarget.AllMonitors : MonitorTarget.UnderCursor);
+    partial void OnDefaultToolChanged(ToolChoice value) => _ = ApplyAsync(s => s.DefaultCaptureTool = value.Key);
     partial void OnDelaySecondsChanged(int value) => _ = ApplyAsync(s => s.CaptureDelaySeconds = value);
 
     [RelayCommand]
@@ -347,10 +429,10 @@ public sealed partial class SettingsViewModel : ViewModelBase
         Languages.Clear();
         var selected = _settings.Current.OcrLanguages;
         foreach (var l in _ocr.GetInstalledLanguages()) Languages.Add(new OcrLanguageRow(this, l, selected.Contains(l, StringComparer.OrdinalIgnoreCase)));
-        OcrEngineText = _ocr.EngineName + (_ocr.IsAvailable ? " (local, offline)" : " (no language data found)");
+        OcrEngineText = _ocr.IsAvailable ? "Local, offline" : "No language data found";
         TessdataPath = _paths.TessdataDirectory;
         OcrNotice = _ocr.UnavailableReason;
-        HasOcrNotice = OcrNotice is not null;
+        HasOcrNotice = !string.IsNullOrWhiteSpace(OcrNotice);
     }
 
     public void OnLanguageToggled()
@@ -480,3 +562,5 @@ public sealed partial class SettingsViewModel : ViewModelBase
         }
     }
 }
+
+public sealed record ToolChoice(string Key, string Label);

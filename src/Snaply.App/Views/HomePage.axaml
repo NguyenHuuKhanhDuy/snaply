@@ -21,30 +21,30 @@
 
       <!-- Capture actions -->
       <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto">
-        <Button Classes="tile" Padding="20" Command="{Binding CaptureRegionCommand}" IsEnabled="{Binding CaptureSupported}" HorizontalAlignment="Stretch"
+        <Button Classes="tile" Padding="20" VerticalAlignment="Stretch" VerticalContentAlignment="Top" Command="{Binding CaptureRegionCommand}" IsEnabled="{Binding CaptureSupported}" HorizontalAlignment="Stretch"
                 AutomationProperties.Name="Capture region">
-          <Grid ColumnDefinitions="Auto,*,Auto">
+          <Grid ColumnDefinitions="Auto,*">
             <Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource AccentSoftBrush}" VerticalAlignment="Top">
               <c:Icon Data="{DynamicResource IconCapture}" Size="22" Stroke="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="3">
               <TextBlock Text="Capture region" Classes="subtitle" />
               <TextBlock Text="Drag over any part of your screen" Classes="secondary" TextWrapping="Wrap" />
+              <c:KeyCaps Gesture="{Binding RegionShortcut}" HorizontalAlignment="Left" Margin="0,8,0,0" />
             </StackPanel>
-            <c:KeyCaps Grid.Column="2" Gesture="{Binding RegionShortcut}" VerticalAlignment="Top" />
           </Grid>
         </Button>
-        <Button Grid.Column="2" Classes="tile" Padding="20" Command="{Binding CaptureFullScreenCommand}" IsEnabled="{Binding CaptureSupported}" HorizontalAlignment="Stretch"
+        <Button Grid.Column="2" Classes="tile" Padding="20" VerticalAlignment="Stretch" VerticalContentAlignment="Top" Command="{Binding CaptureFullScreenCommand}" IsEnabled="{Binding CaptureSupported}" HorizontalAlignment="Stretch"
                 AutomationProperties.Name="Capture full screen">
-          <Grid ColumnDefinitions="Auto,*,Auto">
+          <Grid ColumnDefinitions="Auto,*">
             <Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource AccentSoftBrush}" VerticalAlignment="Top">
               <c:Icon Data="{DynamicResource IconMonitor}" Size="22" Stroke="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="3">
               <TextBlock Text="Capture full screen" Classes="subtitle" />
               <TextBlock Text="The whole monitor, instantly" Classes="secondary" TextWrapping="Wrap" />
+              <c:KeyCaps Gesture="{Binding FullScreenShortcut}" HorizontalAlignment="Left" Margin="0,8,0,0" />
             </StackPanel>
-            <c:KeyCaps Grid.Column="2" Gesture="{Binding FullScreenShortcut}" VerticalAlignment="Top" />
           </Grid>
         </Button>
       </Grid>
@@ -68,14 +68,59 @@
         </StackPanel>
       </Border>
 
+      <!-- Getting started: shown until every step is really done or the user hides it -->
+      <Border Classes="card" IsVisible="{Binding ShowChecklist}" Padding="18,14">
+        <StackPanel Spacing="10">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="{Binding ChecklistTitle}" Classes="subtitle" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="ghost" Content="Hide" Command="{Binding DismissChecklistCommand}" ToolTip.Tip="Hide this checklist" />
+          </Grid>
+          <ItemsControl ItemsSource="{Binding Steps}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:OnboardingStep">
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,6">
+                  <Panel Width="22" Height="22" VerticalAlignment="Top" Margin="0,1,14,0">
+                    <Ellipse Width="20" Height="20" Stroke="{DynamicResource ControlBorderBrush}" StrokeThickness="1.5" IsVisible="{Binding IsOpen}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Ellipse Width="20" Height="20" Fill="{DynamicResource SuccessBrush}" IsVisible="{Binding IsDone}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <c:Icon Data="{DynamicResource IconCheck}" Size="13" Stroke="White" IsVisible="{Binding IsDone}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Panel>
+                  <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Title}" FontWeight="Medium" />
+                    <TextBlock Text="{Binding Description}" Classes="caption secondary" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <Button Grid.Column="2" Classes="secondary" Content="{Binding ActionText}" IsVisible="{Binding IsOpen}" VerticalAlignment="Center" Margin="12,0,0,0"
+                          Command="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).RunStepCommand}" CommandParameter="{Binding}" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <!-- Shortcut problems (conflicts / failures) with a way to fix them -->
+      <Border Classes="card" IsVisible="{Binding HasShortcutIssues}" Padding="16,12" Background="{DynamicResource WarningSoftBrush}" BorderBrush="{DynamicResource WarningBrush}">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <c:Icon Data="{DynamicResource IconAlert}" Stroke="{DynamicResource WarningBrush}" VerticalAlignment="Top" Margin="0,2,12,0" />
+          <StackPanel Grid.Column="1" Spacing="4">
+            <TextBlock Text="Some shortcuts are unavailable" FontWeight="Medium" />
+            <ItemsControl ItemsSource="{Binding ShortcutIssues}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" Classes="caption" TextWrapping="Wrap" /></DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+          <Button Grid.Column="2" Classes="secondary" Content="Fix in Settings" Command="{Binding FixShortcutsCommand}" VerticalAlignment="Center" Margin="12,0,0,0" />
+        </Grid>
+      </Border>
+
       <!-- Recent -->
       <StackPanel Spacing="12">
-        <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Text="Recent" Classes="subtitle" VerticalAlignment="Center" />
-          <Button Grid.Column="1" Classes="ghost" Command="{Binding ViewAllCommand}" IsVisible="{Binding HasRecent}">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <TextBlock Text="Recent" Classes="subtitle" VerticalAlignment="Center" Margin="0,0,8,0" />
+          <Button Classes="ghost" Command="{Binding ViewAllCommand}" IsVisible="{Binding HasRecent}">
             <TextBlock Text="View all" Foreground="{DynamicResource AccentBrush}" FontWeight="Medium" />
           </Button>
-        </Grid>
+        </StackPanel>
 
         <ItemsControl ItemsSource="{Binding Recent}" IsVisible="{Binding HasRecent}">
           <ItemsControl.ItemsPanel>

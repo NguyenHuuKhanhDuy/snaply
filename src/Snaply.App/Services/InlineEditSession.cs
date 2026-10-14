@@ -39,6 +39,13 @@ public sealed class InlineEditSession : IDisposable
     }
 
     /// <summary>Size of the selection in frame pixels.</summary>
+    /// <summary>The configured starting tool for a settings key; unknown or editor-only names fall back to Select (no tool).</summary>
+    public static InlineTool ToolFor(string? key)
+    {
+        var def = AnnotationToolset.Tools.FirstOrDefault(t => t.InOverlay && string.Equals(t.Kind.ToString(), key, StringComparison.OrdinalIgnoreCase));
+        return def is null || def.Kind == AnnotationToolKind.Select ? InlineTool.None : Enum.Parse<InlineTool>(def.Kind.ToString());
+    }
+
     public int Width => (int)Math.Round(_doc.OutputArea.Width);
     public int Height => (int)Math.Round(_doc.OutputArea.Height);
     public DocPoint Origin => new(_doc.OutputArea.X, _doc.OutputArea.Y);

@@ -26,7 +26,8 @@ public interface INotificationService
 /// <summary>Lets the capture workflow hide/show the app window and bring it to front.</summary>
 public interface IAppWindowController
 {
-    Task HideAsync();
+    /// <summary>Hides the main window before a capture. Returns true when a window was actually hidden.</summary>
+    Task<bool> HideAsync();
     Task RestoreAsync();
     void OpenScreenshotInEditor(long screenshotId);
 }
@@ -35,7 +36,7 @@ public enum SelectionAction { Default, Save, Copy }
 
 /// <param name="EditInline">Show the in-place annotation toolbar after the area is chosen.</param>
 /// <param name="Preselect">Start with this virtual-desktop area already selected (used for full-screen captures).</param>
-public sealed record RegionSelectOptions(bool EditInline, bool AutoSave, bool CopyEnabled, PixelRect? Preselect = null);
+public sealed record RegionSelectOptions(bool EditInline, bool AutoSave, bool CopyEnabled, PixelRect? Preselect = null, string? DefaultTool = null);
 
 /// <param name="EditedImage">The cropped image with inline annotations applied; null when no inline editing took place.</param>
 public sealed record RegionSelection(PixelRect Area, RawImage? EditedImage, SelectionAction Action);
@@ -103,7 +104,14 @@ public sealed record LibraryVerification(
 
 public sealed record OcrBlock(string Text, int X, int Y, int Width, int Height, float Confidence);
 
-public sealed record OcrResult(string Text, IReadOnlyList<OcrBlock> Blocks, string Language, string Engine);
+/// <summary>One recognised word with its box in image pixels. <paramref name="Line"/> is the zero-based text line it belongs to.</summary>
+public sealed record OcrWord(string Text, int X, int Y, int Width, int Height, float Confidence, int Line);
+
+public sealed record OcrResult(string Text, IReadOnlyList<OcrBlock> Blocks, string Language, string Engine, IReadOnlyList<OcrWord>? Words = null)
+{
+    /// <summary>Word-level boxes (empty when the engine does not provide them).</summary>
+    public IReadOnlyList<OcrWord> Words { get; init; } = Words ?? Array.Empty<OcrWord>();
+}
 
 public interface IOcrService
 {

@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Snaply.App.ViewModels"
+             xmlns:c="using:Snaply.App.Controls"
+             x:Class="Snaply.App.Controls.ScreenshotRow"
+             x:DataType="vm:ScreenshotItemViewModel"
+             HorizontalAlignment="Stretch">
+  <UserControl.Styles>
+    <Style Selector="Button.rowcheck">
+      <Setter Property="Width" Value="22" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1.5" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.rowcheck.on">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+  </UserControl.Styles>
+  <Button x:Name="Root" Classes="tile" Classes.selected="{Binding IsSelected}" Classes.checked="{Binding IsChecked}" Classes.focused="{Binding IsFocusedItem}"
+          HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding FileName}" ToolTip.Tip="{Binding FileName}" Padding="10,8">
+    <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="14">
+      <Button x:Name="CheckButton" Classes="rowcheck" Classes.on="{Binding IsChecked}" AutomationProperties.Name="Select screenshot" ToolTip.Tip="Select">
+        <c:Icon Data="{DynamicResource IconCheck}" Size="14" Stroke="White" IsVisible="{Binding IsChecked}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+      </Button>
+      <Border Grid.Column="1" Width="72" Height="46" CornerRadius="5" ClipToBounds="True" Background="{DynamicResource SurfaceAltBrush}">
+        <Panel>
+          <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+          <c:Icon Data="{DynamicResource IconImageOff}" Size="18" IsVisible="{Binding IsMissing}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Panel>
+      </Border>
+      <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2">
+        <TextBlock Text="{Binding FileName}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{Binding FormatLabel}" Classes="caption tertiary" />
+      </StackPanel>
+      <TextBlock Grid.Column="3" Text="{Binding DimensionsText}" Classes="caption secondary" VerticalAlignment="Center" Width="86" />
+      <TextBlock Grid.Column="4" Text="{Binding SizeText}" Classes="caption secondary" VerticalAlignment="Center" Width="64" />
+      <TextBlock Grid.Column="5" Text="{Binding TimeText}" Classes="caption secondary" VerticalAlignment="Center" Width="44" />
+      <c:Icon Grid.Column="6" Data="{DynamicResource IconStar}" Size="16" Stroke="#E0A800" IsVisible="{Binding IsFavorite}" VerticalAlignment="Center" Width="16" />
+    </Grid>
+  </Button>
+</UserControl>

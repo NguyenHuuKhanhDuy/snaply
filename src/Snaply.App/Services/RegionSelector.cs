@@ -18,7 +18,7 @@ namespace Snaply.App.Services;
 
 /// <summary>
 /// Shows one borderless, topmost overlay per monitor containing a frozen copy of that monitor. The user drags a rectangle on
-/// one monitor and, when inline editing is enabled, annotates it in place before finishing (Lightshot style). Because the
+/// one monitor and, when inline editing is enabled, annotates it in place before finishing. Because the
 /// overlay shows a frozen frame, it never appears in the captured image.
 /// </summary>
 public sealed class RegionSelector : IRegionSelector
@@ -430,6 +430,7 @@ internal sealed class RegionOverlayWindow : Window
         _sel = selDip;
         _session = new InlineEditSession(_frame, px);
         _session.Changed += () => _canvas.InvalidateVisual();
+        _session.Tool = InlineEditSession.ToolFor(_options.DefaultTool);
         _phase = Phase.Editing;
         _canvas.SetSelection(selDip.TopLeft, selDip.BottomRight);
         _canvas.SetSession(_session);
@@ -581,7 +582,12 @@ internal sealed class RegionOverlayWindow : Window
             return;
         }
 
-        if (e.Key == Key.Enter) DefaultAction();
+        if (!ctrl && e.KeyModifiers == KeyModifiers.None && e.Key is >= Key.A and <= Key.Z
+            && Snaply.Editor.Model.AnnotationToolset.ForShortcut(e.Key.ToString()[0], overlayOnly: true) is { } shortcut)
+        {
+            SelectTool(ToInline(shortcut.Kind));
+        }
+        else if (e.Key == Key.Enter) DefaultAction();
         else if (ctrl && e.Key == Key.Z && e.KeyModifiers.HasFlag(KeyModifiers.Shift)) { _session!.Redo(); UpdateUndoRedo(); }
         else if (ctrl && e.Key == Key.Z) { _session!.Undo(); UpdateUndoRedo(); }
         else if (ctrl && e.Key == Key.Y) { _session!.Redo(); UpdateUndoRedo(); }
@@ -625,6 +631,16 @@ internal sealed class RegionOverlayWindow : Window
         Height = 1, Width = 22, Background = Res<IBrush>("BorderStrongBrush"), Margin = new Thickness(0, 5), HorizontalAlignment = HorizontalAlignment.Center,
     };
 
+    private static InlineTool ToInline(Snaply.Editor.Model.AnnotationToolKind kind) =>
+        kind == Snaply.Editor.Model.AnnotationToolKind.Select ? InlineTool.None : Enum.Parse<InlineTool>(kind.ToString());
+
+    private void SelectTool(InlineTool tool)
+    {
+        _session!.Tool = tool;
+        if (tool != InlineTool.None) _session.Select(null);
+        UpdateToolSelection();
+    }
+
     private void EnsureToolbar()
     {
         if (_toolsBar is not null) return;
@@ -641,15 +657,8 @@ internal sealed class RegionOverlayWindow : Window
             _toolButtons.Add((tool, b));
             _toolControls.Add(b);
         }
-        AddTool(InlineTool.None, "IconSelect", "Select (move or resize the area)");
-        AddTool(InlineTool.Rectangle, "IconSquare", "Rectangle");
-        AddTool(InlineTool.Ellipse, "IconCircle", "Ellipse");
-        AddTool(InlineTool.Arrow, "IconArrow", "Arrow (hold Shift for 45°)");
-        AddTool(InlineTool.Highlight, "IconHighlight", "Highlight");
-        AddTool(InlineTool.Text, "IconType", "Text");
-        AddTool(InlineTool.Step, "IconStep", "Numbered step");
-        AddTool(InlineTool.Blur, "IconBlur", "Blur");
-        AddTool(InlineTool.Pixelate, "IconPixelate", "Pixelate");
+        foreach (var def in Snaply.Editor.Model.AnnotationToolset.Tools.Where(t => t.InOverlay))
+            AddTool(ToInline(def.Kind), def.IconKey, def.Tooltip);
         _undoButton = MakeIconButton("IconUndo", "Undo (Ctrl+Z)", () => { _session!.Undo(); UpdateUndoRedo(); });
         _redoButton = MakeIconButton("IconRedo", "Redo (Ctrl+Y)", () => { _session!.Redo(); UpdateUndoRedo(); });
         _toolControls.Add(_undoButton);
@@ -657,7 +666,7 @@ internal sealed class RegionOverlayWindow : Window
 
         // Bottom row: colours, stroke width and the finishing actions.
         var options = new WrapPanel { Orientation = Orientation.Horizontal, ItemHeight = 34 };
-        foreach (var color in Snaply.Editor.Model.Colors.Palette)
+        foreach (var color in Snaply.Editor.Model.AnnotationToolset.Palette)
         {
             var swatch = new Button
             {
@@ -676,8 +685,9 @@ internal sealed class RegionOverlayWindow : Window
         }
         options.Children.Add(HSeparator());
 
-        foreach (var (w, tip) in new[] { (2f, "Thin"), (4f, "Medium"), (8f, "Thick") })
+        foreach (var preset in Snaply.Editor.Model.AnnotationToolset.StrokePresets)
         {
+            var (w, tip) = (preset.Width, preset.Name);
             var dot = new Avalonia.Controls.Shapes.Ellipse { Width = 4 + w, Height = 4 + w, Fill = Res<IBrush>("TextSecondaryBrush") };
             var b = new Button { Classes = { "icon" }, Content = dot, Width = 30, Height = 32 };
             ToolTip.SetTip(b, tip + " stroke");

@@ -69,7 +69,7 @@ public sealed partial class DetailsViewModel : ObservableObject
 
         if (!IsMissing)
         {
-            var bmp = await Task.Run(() => ImageBridge.LoadScaled(shot.FilePath, 640)).ConfigureAwait(true);
+            var bmp = await Task.Run(() => ImageBridge.LoadScaled(shot.FilePath, 1280)).ConfigureAwait(true);
             if (version != _version) { bmp?.Dispose(); return; }
             Preview = bmp;
             OnPropertyChanged(nameof(PreviewUnavailable));
@@ -97,6 +97,7 @@ public sealed partial class DetailsViewModel : ObservableObject
         _hub.OpenEditor?.Invoke(Shot.Id);
     }
 
+    [RelayCommand] private Task CopyPathAsync() => Shot is null ? Task.CompletedTask : _actions.CopyTextAsync(Shot.FilePath, "Path copied");
     [RelayCommand] private Task CopyImageAsync() => Shot is null ? Task.CompletedTask : _actions.CopyImageAsync(Shot);
     [RelayCommand] private Task ExportAsync() => Shot is null ? Task.CompletedTask : _actions.ExportAsync(Shot);
     [RelayCommand] private void Reveal() { if (Shot is not null) _actions.Reveal(Shot); }
