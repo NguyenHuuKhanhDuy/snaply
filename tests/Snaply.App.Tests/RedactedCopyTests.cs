@@ -119,4 +119,23 @@ public class RedactedCopyTests
         var px = (100 + 50) * 4 + (100 + 20) * copied!.Width * 4; // a pixel inside the box
         Assert.Equal(new byte[] { 0, 0, 0 }, copied.Bgra[px..(px + 3)]);
     }
+
+    [AvaloniaFact(Timeout = 60_000)]
+    public async Task The_copy_does_not_inherit_the_window_title_of_the_original()
+    {
+        var (fx, editor, originalId) = await OpenWithBoxAsync();
+        using var _ = fx; using var __ = editor;
+        var factory = fx.Services.GetRequiredService<Microsoft.EntityFrameworkCore.IDbContextFactory<Snaply.Infrastructure.Persistence.SnaplyDbContext>>();
+        await using (var db = await factory.CreateDbContextAsync())
+        {
+            (await db.Screenshots.FindAsync(originalId))!.SourceTitle = "Bank - Statement.pdf";
+            await db.SaveChangesAsync();
+        }
+
+        await editor.SaveRedactedCopyCommand.ExecuteAsync(null);
+
+        var copy = await FindCopyAsync(fx, originalId);
+        Assert.Null(copy.SourceTitle);
+        Assert.Equal("Bank - Statement.pdf", (await fx.Services.GetRequiredService<IScreenshotRepository>().GetAsync(originalId))!.SourceTitle);
+    }
 }

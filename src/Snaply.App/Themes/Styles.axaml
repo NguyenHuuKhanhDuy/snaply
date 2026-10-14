@@ -178,10 +178,13 @@
     <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
   </Style>
   <Style Selector="Button.icon:disabled">
-    <Setter Property="Opacity" Value="0.4" />
+    <Setter Property="Opacity" Value="0.35" />
+  </Style>
+  <Style Selector="Button.icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
   </Style>
   <Style Selector="Button.icon.active /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+    <Setter Property="Background" Value="{DynamicResource SelectionBrush}" />
   </Style>
   <Style Selector="Button.icon.active c|Icon">
     <Setter Property="TextElement.Foreground" Value="{DynamicResource AccentBrush}" />
@@ -334,6 +337,65 @@
       <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="{DynamicResource SurfaceColor}" />
       <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="{DynamicResource BorderStrongColor}" />
     </Style.Resources>
+  </Style>
+
+  <!-- Cards: accent border while hovered -->
+  <Style Selector="Button.tile:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  </Style>
+
+  <!-- Settings section list: plain text, only a soft background marks the current section -->
+  <Style Selector="Button.subnav">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+  </Style>
+  <Style Selector="Button.subnav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceHoverBrush}" />
+  </Style>
+  <Style Selector="Button.subnav.active /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+  <Style Selector="Button.subnav.active TextBlock"><Setter Property="FontWeight" Value="Medium" /><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" /></Style>
+
+  <!-- Round accent swatches -->
+  <Style Selector="Button.dot">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.dot:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="Transparent" /></Style>
+
+  <!-- Small outlined tag next to a setting name -->
+  <Style Selector="Border.pill">
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="7,1" />
+  </Style>
+
+  <!-- A disabled switch looks faded, not like a solid grey "on" block -->
+  <Style Selector="ToggleSwitch:disabled"><Setter Property="Opacity" Value="0.4" /></Style>
+
+  <!-- Colour theme swatches in Appearance -->
+  <Style Selector="Button.swatch">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="10" />
+  </Style>
+  <Style Selector="Button.swatch.selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="Background" Value="{DynamicResource SelectionBrush}" />
   </Style>
 
   <!-- Choice buttons that show which option is on (overlay style panel) -->

@@ -228,7 +228,7 @@ public class CaptureOrchestratorTests
                 ? Result<RawImage>.Fail(ErrorCode.Failed, "empty")
                 : Result<RawImage>.Ok(new RawImage(c.Arg<PixelRect>().Width, c.Arg<PixelRect>().Height, new byte[c.Arg<PixelRect>().Width * c.Arg<PixelRect>().Height * 4])));
         _settings.Current.Returns(_s);
-        _library.AddAsync(Arg.Any<RawImage>(), Arg.Any<CaptureMethod>(), Arg.Any<CancellationToken>())
+        _library.AddAsync(Arg.Any<RawImage>(), Arg.Any<CaptureMethod>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(Result<Screenshot>.Ok(new Screenshot { Id = 7 }));
         _clipboard.SetImageAsync(Arg.Any<RawImage>(), Arg.Any<CancellationToken>()).Returns(Result.Ok());
         _window.HideAsync().Returns(Task.FromResult(true));
@@ -383,7 +383,7 @@ public class CaptureOrchestratorTests
         _selector.SelectAsync(default!, default, default!, default!, default).ReturnsForAnyArgs(new RegionSelection(new PixelRect(10, 10, 20, 20), edited, SelectionAction.Default));
         var r = await Sut().CaptureAsync(CaptureMode.Region);
         Assert.Same(edited, r.Value.Image);
-        await _library.Received().AddAsync(edited, Arg.Any<CaptureMethod>(), Arg.Any<CancellationToken>());
+        await _library.Received().AddAsync(edited, Arg.Any<CaptureMethod>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -20,18 +20,55 @@
     <Grid RowDefinitions="Auto,*">
       <!-- Header -->
       <StackPanel Margin="28,24,28,12" Spacing="14">
-        <Grid ColumnDefinitions="*,Auto">
-          <StackPanel Spacing="2">
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+          <StackPanel Spacing="2" VerticalAlignment="Center">
             <TextBlock Text="{Binding Title}" Classes="title" TextTrimming="CharacterEllipsis" />
             <TextBlock Text="{Binding CountText}" Classes="secondary" />
           </StackPanel>
-          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+          <TextBox x:Name="SearchBox" Grid.Column="1" Width="400" VerticalAlignment="Center" Text="{Binding SearchText}"
+                   Watermark="Search by window, tag or text in image" AutomationProperties.Name="Search screenshots">
+            <TextBox.InnerLeftContent>
+              <c:Icon Data="{DynamicResource IconSearch}" Size="16" Margin="10,0,0,0" VerticalAlignment="Center" />
+            </TextBox.InnerLeftContent>
+            <TextBox.InnerRightContent>
+              <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,6,0" VerticalAlignment="Center">
+                <Button Classes="icon" Width="26" Height="26" Command="{Binding ClearFiltersCommand}" IsVisible="{Binding HasFilters}" ToolTip.Tip="Clear search and filters" AutomationProperties.Name="Clear filters">
+                  <c:Icon Data="{DynamicResource IconClose}" Size="13" />
+                </Button>
+                <c:KeyCaps Gesture="Ctrl+K" IsVisible="{Binding !HasFilters}" />
+              </StackPanel>
+            </TextBox.InnerRightContent>
+          </TextBox>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
             <Button Classes="icon" Classes.active="{Binding IsGridMode}" Command="{Binding SetViewModeCommand}" CommandParameter="{x:Static m:GalleryViewMode.Grid}" ToolTip.Tip="Grid view" AutomationProperties.Name="Grid view">
               <c:Icon Data="{DynamicResource IconImages}" Size="17" />
             </Button>
             <Button Classes="icon" Classes.active="{Binding IsListMode}" Command="{Binding SetViewModeCommand}" CommandParameter="{x:Static m:GalleryViewMode.List}" ToolTip.Tip="List view" AutomationProperties.Name="List view">
               <c:Icon Data="{DynamicResource IconList}" Size="17" />
             </Button>
+          </StackPanel>
+        </Grid>
+
+        <!-- Quick actions (Library only) and filters -->
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+          <WrapPanel IsVisible="{Binding IsLibrary}" VerticalAlignment="Center">
+            <Button Classes="secondary" Margin="0,0,8,6" Command="{Binding Header.CaptureFullScreenCommand}" IsEnabled="{Binding Header.CaptureSupported}" AutomationProperties.Name="Capture full screen">
+              <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Data="{DynamicResource IconMonitor}" Size="16" /><TextBlock Text="Full screen" /><c:KeyCaps Gesture="{Binding Header.FullScreenShortcut}" /></StackPanel>
+            </Button>
+            <Button Classes="secondary" Margin="0,0,8,6" Command="{Binding Header.CaptureDelayedCommand}" IsEnabled="{Binding Header.CaptureSupported}" ToolTip.Tip="Start a region capture after 5 seconds" AutomationProperties.Name="Capture region in 5 seconds">
+              <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Data="{DynamicResource IconRefresh}" Size="16" /><TextBlock Text="Delay 5s" /></StackPanel>
+            </Button>
+            <Button Classes="secondary" Margin="0,0,8,6" Command="{Binding Header.RepeatLastCommand}" IsEnabled="{Binding Header.CanRepeat}" ToolTip.Tip="Capture the same area again" AutomationProperties.Name="Repeat last region">
+              <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Data="{DynamicResource IconRefresh}" Size="16" /><TextBlock Text="Repeat last region" /></StackPanel>
+            </Button>
+          </WrapPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <ComboBox ItemsSource="{Binding FormatOptions}" SelectedItem="{Binding SelectedFormat}" MinWidth="130" AutomationProperties.Name="Filter by format">
+              <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FilterOption"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate>
+            </ComboBox>
+            <ComboBox ItemsSource="{Binding DateOptions}" SelectedItem="{Binding SelectedDate}" MinWidth="140" AutomationProperties.Name="Filter by date">
+              <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FilterOption"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate>
+            </ComboBox>
           </StackPanel>
         </Grid>
         <!-- Selection bar: appears while screenshots are ticked -->
@@ -50,24 +87,7 @@
             </StackPanel>
           </Grid>
         </Border>
-        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-          <TextBox Text="{Binding SearchText}" Watermark="Search by file name or text in the image" AutomationProperties.Name="Search screenshots">
-            <TextBox.InnerLeftContent>
-              <c:Icon Data="{DynamicResource IconSearch}" Size="16" Margin="10,0,0,0" VerticalAlignment="Center" />
-            </TextBox.InnerLeftContent>
-            <TextBox.InnerRightContent>
-              <Button Classes="icon" Width="26" Height="26" Margin="0,0,4,0" Command="{Binding ClearFiltersCommand}" IsVisible="{Binding HasFilters}" ToolTip.Tip="Clear search and filters" AutomationProperties.Name="Clear filters">
-                <c:Icon Data="{DynamicResource IconClose}" Size="13" />
-              </Button>
-            </TextBox.InnerRightContent>
-          </TextBox>
-          <ComboBox Grid.Column="1" ItemsSource="{Binding FormatOptions}" SelectedItem="{Binding SelectedFormat}" MinWidth="130" AutomationProperties.Name="Filter by format">
-            <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FilterOption"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate>
-          </ComboBox>
-          <ComboBox Grid.Column="2" ItemsSource="{Binding DateOptions}" SelectedItem="{Binding SelectedDate}" MinWidth="140" AutomationProperties.Name="Filter by date">
-            <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FilterOption"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate>
-          </ComboBox>
-        </Grid>
+        <Border IsVisible="{Binding IsLibrary}"><v:LibraryHeader DataContext="{Binding Header}" /></Border>
       </StackPanel>
 
       <!-- Grid -->
@@ -86,6 +106,7 @@
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:ScreenshotItemViewModel">
                           <c:ScreenshotTile Margin="0,0,14,14"
+                                            Actions="{Binding $parent[v:GalleryPage].((vm:GalleryViewModel)DataContext)}"
                                             ModifierClickCommand="{Binding $parent[v:GalleryPage].((vm:GalleryViewModel)DataContext).TileClickCommand}"
                                             CheckCommand="{Binding $parent[v:GalleryPage].((vm:GalleryViewModel)DataContext).ToggleCheckCommand}" />
                         </DataTemplate>
@@ -112,7 +133,14 @@
           <TextBlock Text="Loading your screenshots…" Classes="secondary" HorizontalAlignment="Center" />
           <ProgressBar IsIndeterminate="True" Height="3" />
         </StackPanel>
-        <c:EmptyState IsVisible="{Binding ShowEmptyLibrary}" Icon="{DynamicResource IconImages}" Title="{Binding EmptyTitle}" Description="{Binding EmptyHint}" />
+        <c:EmptyState IsVisible="{Binding ShowEmptyLibrary}" Icon="{DynamicResource IconImages}" Title="{Binding EmptyTitle}" Description="{Binding EmptyHint}">
+          <Button Classes="primary" IsVisible="{Binding IsLibrary}" Command="{Binding Header.CaptureRegionCommand}" IsEnabled="{Binding Header.CaptureSupported}" AutomationProperties.Name="Capture your first screenshot">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:Icon Data="{DynamicResource IconCapture}" Size="16" />
+              <TextBlock Text="Capture your first screenshot" Foreground="{DynamicResource OnAccentBrush}" FontWeight="SemiBold" />
+            </StackPanel>
+          </Button>
+        </c:EmptyState>
         <c:EmptyState IsVisible="{Binding ShowNoResults}" Icon="{DynamicResource IconSearch}" Title="No matching screenshots" Description="Try a different search or clear the filters.">
           <Button Classes="secondary" Content="Clear filters" Command="{Binding ClearFiltersCommand}" />
         </c:EmptyState>

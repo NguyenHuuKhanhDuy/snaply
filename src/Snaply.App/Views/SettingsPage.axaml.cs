@@ -11,7 +11,7 @@ namespace Snaply.App.Views;
 public partial class SettingsPage : UserControl
 {
     private const double CompactWidth = 820;
-    private static readonly string[] Keys = { "appearance", "capture", "shortcuts", "ocr", "redaction", "storage", "updates", "about" };
+    private static readonly string[] Keys = { "general", "appearance", "capture", "shortcuts", "ocr", "redaction", "storage", "updates", "about" };
 
     private SettingsViewModel? _vm;
     private DateTime _lockTrackingUntil;

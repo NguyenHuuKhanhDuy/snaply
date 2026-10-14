@@ -23,6 +23,7 @@ public sealed class OnboardingStep
     public Action Action { get; }
 }
 
+/// <summary>State of the Library header: quick capture actions, shortcut hints and the getting-started card. (Formerly the Home page.)</summary>
 public sealed partial class HomeViewModel : ViewModelBase
 {
     private readonly CaptureCoordinator _capture;
@@ -73,7 +74,7 @@ public sealed partial class HomeViewModel : ViewModelBase
         var shortcutsOk = _hotkeys.IsSupported && statuses.Count > 0 && statuses.Values.All(s => s.IsRegistered);
         var steps = new List<OnboardingStep>
         {
-            new("Take your first capture", "Use the buttons above or your shortcut. It appears in Recent.", TotalCount > 0, "Capture now", () => _ = _capture.CaptureRegionAsync()),
+            new("Take your first capture", "Use the Capture region button or your shortcut. It appears below.", TotalCount > 0, "Capture now", () => _ = _capture.CaptureRegionAsync()),
             new("Check your keyboard shortcuts", _hotkeys.IsSupported
                     ? (shortcutsOk ? "Your capture shortcuts are active." : "Some shortcuts could not be registered.")
                     : "Global shortcuts are not available on this system.",
@@ -106,16 +107,8 @@ public sealed partial class HomeViewModel : ViewModelBase
 
     [RelayCommand] private void RunStep(OnboardingStep? step) => step?.Action();
     [RelayCommand] private void FixShortcuts() => OpenSettingsSection?.Invoke("shortcuts");
-    public Action<NavDestination>? NavigateTo { get; set; }
-
-    public ObservableCollection<ScreenshotItemViewModel> Recent { get; } = new();
-
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasRecent), nameof(ShowEmpty))] private int _recentCount;
     [ObservableProperty] private int _totalCount;
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowEmpty))] private bool _loaded;
-
-    public bool HasRecent => RecentCount > 0;
-    public bool ShowEmpty => Loaded && RecentCount == 0;
+    [ObservableProperty] private bool _loaded;
 
     public bool CaptureSupported => _captureService.Support.IsSupported;
     public string? CaptureUnsupportedReason => _captureService.Support.UnsupportedReason;
@@ -138,20 +131,7 @@ public sealed partial class HomeViewModel : ViewModelBase
 
     private async Task LoadAsync()
     {
-        var total = await _repo.CountAsync(new ScreenshotQuery()).ConfigureAwait(true);
-        var page = await _repo.QueryAsync(new ScreenshotQuery(), null, 6).ConfigureAwait(true);
-
-        var old = Recent.ToList();
-        Recent.Clear();
-        foreach (var o in old) o.Dispose();
-        foreach (var s in page)
-        {
-            var item = new ScreenshotItemViewModel(s);
-            Recent.Add(item);
-            _ = item.LoadThumbnailAsync(_library);
-        }
-        TotalCount = total;
-        RecentCount = page.Count;
+        TotalCount = await _repo.CountAsync(new ScreenshotQuery()).ConfigureAwait(true);
         Loaded = true;
         OnPropertyChanged(nameof(CanRepeat));
         RefreshStatus();
@@ -161,7 +141,4 @@ public sealed partial class HomeViewModel : ViewModelBase
     [RelayCommand] private Task CaptureFullScreenAsync() => _capture.CaptureFullScreenAsync();
     [RelayCommand] private Task CaptureDelayedAsync() => _capture.CaptureRegionAsync(5);
     [RelayCommand] private Task RepeatLastAsync() => _capture.RepeatLastAsync();
-    [RelayCommand] private void OpenItem(ScreenshotItemViewModel? item) { if (item is not null) _hub.OpenEditor?.Invoke(item.Model.Id); }
-    [RelayCommand] private void ViewAll() => NavigateTo?.Invoke(NavDestination.All);
-    [RelayCommand] private void OpenShortcutSettings() => NavigateTo?.Invoke(NavDestination.Settings);
 }

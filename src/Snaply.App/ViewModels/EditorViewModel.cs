@@ -242,8 +242,22 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private EditorTool _previousTool = EditorTool.Rectangle;
+
     partial void OnToolChanged(EditorTool value)
     {
+        // Until the user picks a colour, Highlight shows (and uses) yellow, and the default red returns when leaving it.
+        if (!_colorPicked)
+        {
+            var target = value == EditorTool.Highlight ? Snaply.Editor.Model.Colors.Yellow
+                : _previousTool == EditorTool.Highlight ? Snaply.Editor.Model.Colors.Red : (uint?)null;
+            if (target is { } argb && Colors.FirstOrDefault(c => c.Argb == argb) is { } choice && choice != SelectedColor)
+            {
+                _syncingStyle = true;
+                try { SelectedColor = choice; } finally { _syncingStyle = false; }
+            }
+        }
+        _previousTool = value;
         UpdateToolButtons();
         if (value != EditorTool.Select) SelectedId = null;
         OnPropertyChanged(nameof(IsTextTool)); OnPropertyChanged(nameof(UsesStroke)); OnPropertyChanged(nameof(UsesColor));
@@ -326,7 +340,7 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
             EditorTool.Line => new ArrowAnnotation { Start = a, End = b, Color = color, StrokeWidth = Math.Max(width, 2), Head = ArrowHead.None, Pattern = LinePattern },
             EditorTool.Pen => CreatePen(a, b, color, width),
             EditorTool.Spotlight => new SpotlightAnnotation { Rect = rect, Dim = SpotlightDim },
-            EditorTool.Highlight => new HighlightAnnotation { Rect = rect, Color = color == Snaply.Editor.Model.Colors.Red ? Snaply.Editor.Model.Colors.Yellow : color },
+            EditorTool.Highlight => new HighlightAnnotation { Rect = rect, Color = color },
             EditorTool.Redact => new RedactAnnotation { Rect = rect, Color = color is Snaply.Editor.Model.Colors.Black or Snaply.Editor.Model.Colors.White ? color : Snaply.Editor.Model.Colors.RedactFill },
             EditorTool.Blur => new BlurAnnotation { Rect = rect, Radius = Math.Max(8, Math.Min(rect.Width, rect.Height) / 6) },
             EditorTool.Pixelate => new PixelateAnnotation { Rect = rect, BlockSize = (int)Math.Max(8, Math.Min(rect.Width, rect.Height) / 8) },
@@ -469,7 +483,9 @@ public sealed partial class EditorViewModel : ViewModelBase, IDisposable
     [RelayCommand] private void Undo() { History?.Undo(); }
     [RelayCommand] private void Redo() { History?.Redo(); }
     [RelayCommand] private void SetTool(EditorTool tool) => Tool = tool;
-    [RelayCommand] private void PickColor(ColorChoice? c) { if (c is not null) SelectedColor = c; }
+    /// <summary>True once the user chose a colour; until then the Highlight tool switches the colour to yellow by itself.</summary>
+    private bool _colorPicked;
+    [RelayCommand] private void PickColor(ColorChoice? c) { if (c is null) return; _colorPicked = true; SelectedColor = c; }
     [RelayCommand] private void Fit() => FitRequested?.Invoke();
     [RelayCommand] private void ZoomIn() => SetZoom(Zoom * 1.25);
     [RelayCommand] private void ZoomOut() => SetZoom(Zoom / 1.25);

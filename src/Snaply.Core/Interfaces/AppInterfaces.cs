@@ -84,10 +84,10 @@ public interface IScreenshotRepository
 /// <summary>High-level library operations that keep database rows, image files and thumbnails consistent.</summary>
 public interface IScreenshotLibrary
 {
-    Task<Result<Screenshot>> AddAsync(RawImage image, CaptureMethod method, CancellationToken ct = default);
+    Task<Result<Screenshot>> AddAsync(RawImage image, CaptureMethod method, string? sourceTitle = null, CancellationToken ct = default);
 
     /// <summary>Adds an already-encoded image (e.g. editor output). Extension decides the format.</summary>
-    Task<Result<Screenshot>> AddEncodedAsync(byte[] data, string extension, int width, int height, CaptureMethod method, CancellationToken ct = default);
+    Task<Result<Screenshot>> AddEncodedAsync(byte[] data, string extension, int width, int height, CaptureMethod method, string? sourceTitle = null, CancellationToken ct = default);
 
     /// <summary>Removes DB row, thumbnail and image file. Reports file deletion failures instead of hiding them.</summary>
     Task<Result> DeleteAsync(long id, CancellationToken ct = default);

@@ -27,6 +27,13 @@ public interface IClipboardService
     Task<Result> SetTextAsync(string text, CancellationToken ct = default);
 }
 
+/// <summary>Reads the title of the window the user is working in, so a capture can remember where it came from.</summary>
+public interface IActiveWindowService
+{
+    /// <summary>The foreground window's title, or null when there is none, it belongs to Snaply, or the platform cannot tell.</summary>
+    string? GetForegroundWindowTitle();
+}
+
 /// <summary>Starts the app when the user signs in to the operating system (per user, never system-wide).</summary>
 public interface IStartupRegistration
 {

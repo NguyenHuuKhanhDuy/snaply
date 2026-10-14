@@ -76,9 +76,8 @@ internal sealed class RegionOverlayWindow : Window
     private StrokePattern _stylePattern;
     private ArrowHead _styleHead = ArrowHead.End;
     private double _styleDimPercent = SpotlightAnnotation.DefaultDim * 100;
-    private readonly List<(Button Button, Func<bool> IsOn)> _styleChoices = new();
     private TextBackgroundStyle _styleTextBg;
-    private Button? _styleButton, _boldButton;
+    private Button? _boldButton;
     private Button? _undoButton, _redoButton;
     private TextBox? _textBox;
     private bool _drawing;
@@ -437,7 +436,7 @@ internal sealed class RegionOverlayWindow : Window
         _session?.Dispose();
         _sel = selDip;
         _session = new InlineEditSession(_frame, px);
-        _session.Changed += () => _canvas.InvalidateVisual();
+        _session.Changed += () => { _canvas.InvalidateVisual(); RefreshOptions(); };
         _session.Tool = InlineEditSession.ToolFor(_options.DefaultTool);
         _session.Pattern = _stylePattern; _session.Bold = _styleBold; _session.TextBackground = _styleTextBg;
         _session.ArrowHeadStyle = _styleHead; _session.SpotlightDim = (float)(_styleDimPercent / 100);
@@ -656,10 +655,12 @@ internal sealed class RegionOverlayWindow : Window
     {
         if (_toolsBar is not null) return;
 
-        // Drawing tools and undo/redo; arranged as one or two columns in LayoutTools depending on the selection height.
-        void AddTool(InlineTool tool, string icon, string tip)
+        // ---- Vertical bar: four groups separated by rules, undo/redo at the bottom ----
+        void AddTool(Snaply.Editor.Model.AnnotationToolKind kind)
         {
-            var b = MakeIconButton(icon, tip, () =>
+            var def = Snaply.Editor.Model.AnnotationToolset.Get(kind);
+            var tool = ToInline(kind);
+            var b = MakeIconButton(def.IconKey, def.Tooltip, () =>
             {
                 _session!.Tool = _session.Tool == tool ? InlineTool.None : tool;
                 if (_session.Tool != InlineTool.None) _session.Select(null);
@@ -668,15 +669,86 @@ internal sealed class RegionOverlayWindow : Window
             _toolButtons.Add((tool, b));
             _toolControls.Add(b);
         }
-        foreach (var def in Snaply.Editor.Model.AnnotationToolset.Tools.Where(t => t.InOverlay))
-            AddTool(ToInline(def.Kind), def.IconKey, def.Tooltip);
+
+        var groups = new[]
+        {
+            new[] { Snaply.Editor.Model.AnnotationToolKind.Select },
+            new[] { Snaply.Editor.Model.AnnotationToolKind.Rectangle, Snaply.Editor.Model.AnnotationToolKind.Ellipse, Snaply.Editor.Model.AnnotationToolKind.Line, Snaply.Editor.Model.AnnotationToolKind.Arrow },
+            new[] { Snaply.Editor.Model.AnnotationToolKind.Pen, Snaply.Editor.Model.AnnotationToolKind.Highlight, Snaply.Editor.Model.AnnotationToolKind.Text, Snaply.Editor.Model.AnnotationToolKind.Step },
+            new[] { Snaply.Editor.Model.AnnotationToolKind.Spotlight, Snaply.Editor.Model.AnnotationToolKind.Blur, Snaply.Editor.Model.AnnotationToolKind.Pixelate },
+        };
+        for (var g = 0; g < groups.Length; g++)
+        {
+            if (g > 0) _toolControls.Add(VSeparator());
+            foreach (var kind in groups[g]) AddTool(kind);
+        }
+        _toolControls.Add(VSeparator());
         _undoButton = MakeIconButton("IconUndo", "Undo (Ctrl+Z)", () => { _session!.Undo(); UpdateUndoRedo(); });
         _redoButton = MakeIconButton("IconRedo", "Redo (Ctrl+Y)", () => { _session!.Redo(); UpdateUndoRedo(); });
         _toolControls.Add(_undoButton);
         _toolControls.Add(_redoButton);
 
-        // Bottom row: colours, stroke width and the finishing actions.
-        var options = new WrapPanel { Orientation = Orientation.Horizontal, ItemHeight = 34 };
+        // ---- Horizontal bar: the options of the active tool on the left, the finishing actions on the right ----
+        BuildOptionGroups();
+
+        _optionsPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+        actions.Children.Add(HSeparator());
+        actions.Children.Add(MakeIconButton("IconClose", "Cancel (Esc)", Cancel));
+        if (_options.AutoSave)
+            actions.Children.Add(MakeIconButton("IconCheck", "Save and finish (Enter)", DefaultAction));
+        else
+            actions.Children.Add(MakeIconButton("IconSave", "Save to library (Ctrl+S)", () => CompleteEditing(SelectionAction.Save)));
+        var copy = new Button
+        {
+            Classes = { "primary" }, Height = 32, Padding = new Thickness(12, 0),
+            Content = new StackPanel
+            {
+                Orientation = Orientation.Horizontal, Spacing = 7,
+                Children =
+                {
+                    new Icon { Data = Res<Geometry>("IconCopy"), Size = 16, Stroke = Res<IBrush>("OnAccentBrush") },
+                    new TextBlock { Text = "Copy", FontWeight = FontWeight.SemiBold, Foreground = Res<IBrush>("OnAccentBrush"), VerticalAlignment = VerticalAlignment.Center },
+                },
+            },
+        };
+        ToolTip.SetTip(copy, "Copy to clipboard (Ctrl+C)");
+        Avalonia.Automation.AutomationProperties.SetName(copy, "Copy to clipboard");
+        copy.Click += (_, _) => { CompleteEditing(SelectionAction.Copy); Focus(); };
+        actions.Children.Add(copy);
+
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        row.Children.Add(_optionsPanel);
+        row.Children.Add(actions);
+
+        _toolsBar = MakeBar(new StackPanel());
+        _optionsBar = MakeBar(row);
+        _layer.Children.Add(_toolsBar);
+        _layer.Children.Add(_optionsBar);
+    }
+
+    // ---- option groups (built once, shown per tool) ----
+
+    private StackPanel? _optionsPanel;
+    private StackPanel? _grpColor, _grpWidth, _grpLine, _grpHead, _grpText, _grpDim;
+    private TextBlock? _hint;
+    private Panel? _linePreview;
+    private readonly List<(ArrowHead Head, Button Button)> _headButtons = new();
+    private readonly List<(TextBackgroundStyle Bg, Button Button)> _bgButtons = new();
+    private string _optionsKey = "";
+    private bool _barBelow = true;
+
+    private static StackPanel Row(params Control[] items)
+    {
+        var p = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+        foreach (var i in items) p.Children.Add(i);
+        return p;
+    }
+
+    private void BuildOptionGroups()
+    {
+        // colours
+        _grpColor = Row();
         foreach (var color in Snaply.Editor.Model.AnnotationToolset.Palette)
         {
             var swatch = new Button
@@ -689,44 +761,209 @@ internal sealed class RegionOverlayWindow : Window
                 },
             };
             var c = color;
-            swatch.Click += (_, _) => { _session!.Color = c; _session.RestyleSelected(InlineEditSession.RestyleScope.ColorStroke); UpdateToolSelection(); UpdateUndoRedo(); Focus(); };
+            swatch.Click += (_, _) => { _session!.Color = c; _session.ColorChosen = true; _session.RestyleSelected(InlineEditSession.RestyleScope.ColorStroke); UpdateToolSelection(); UpdateUndoRedo(); Focus(); };
             Avalonia.Automation.AutomationProperties.SetName(swatch, "Annotation color");
             _colorButtons.Add((color, swatch));
-            options.Children.Add(swatch);
+            _grpColor.Children.Add(swatch);
         }
-        options.Children.Add(HSeparator());
 
+        // width (stroke width, or text size for the Text tool)
+        _grpWidth = Row();
         foreach (var preset in Snaply.Editor.Model.AnnotationToolset.StrokePresets)
         {
-            var (w, tip) = (preset.Width, preset.Name);
+            var w = preset.Width;
             var dot = new Avalonia.Controls.Shapes.Ellipse { Width = 4 + w, Height = 4 + w, Fill = Res<IBrush>("TextSecondaryBrush") };
             var b = new Button { Classes = { "icon" }, Content = dot, Width = 30, Height = 32 };
-            ToolTip.SetTip(b, tip + " stroke");
-            Avalonia.Automation.AutomationProperties.SetName(b, tip + " stroke");
-            var width = w;
-            b.Click += (_, _) => { _session!.Stroke = width; _session.RestyleSelected(InlineEditSession.RestyleScope.ColorStroke); UpdateToolSelection(); UpdateUndoRedo(); Focus(); };
+            b.Click += (_, _) => { _session!.Stroke = w; _session.RestyleSelected(InlineEditSession.RestyleScope.ColorStroke); UpdateToolSelection(); UpdateUndoRedo(); Focus(); };
             _widthButtons.Add((w, b));
-            options.Children.Add(b);
+            _grpWidth.Children.Add(b);
         }
-        options.Children.Add(HSeparator());
 
-        // Bold is a quick toggle; everything else about line and text style is chosen directly in the Style panel.
+        // line style: a drop-down showing the current pattern, opening a list of previews
+        _grpLine = Row(BuildLineStyleButton());
+
+        // arrow head
+        _grpHead = Row();
+        foreach (var (head, icon, name) in new[] { (ArrowHead.None, "IconHeadNone", "No arrow head"), (ArrowHead.End, "IconHeadEnd", "Arrow at end"), (ArrowHead.Both, "IconHeadBoth", "Arrows at both ends") })
+        {
+            var h = head;
+            var b = MakeIconButton(icon, name, () => { _styleHead = h; ApplyStyle(InlineEditSession.RestyleScope.Head); });
+            _headButtons.Add((head, b));
+            _grpHead.Children.Add(b);
+        }
+
+        // text: bold + background
+        _grpText = Row();
         _boldButton = MakeIconButton("IconBold", "Bold text", () => { _styleBold = !_styleBold; ApplyStyle(InlineEditSession.RestyleScope.Text); });
-        _styleButton = BuildStyleButton();
-        options.Children.Add(_boldButton); options.Children.Add(_styleButton);
-        options.Children.Add(HSeparator());
+        _grpText.Children.Add(_boldButton);
+        foreach (var bg in new[] { TextBackgroundStyle.None, TextBackgroundStyle.Soft, TextBackgroundStyle.Solid, TextBackgroundStyle.Outline })
+        {
+            var style = bg;
+            var b = new Button { Classes = { "secondary" }, Content = bg.ToString(), Height = 28, MinHeight = 0, Padding = new Thickness(9, 0), Margin = new Thickness(2, 0, 0, 0) };
+            ToolTip.SetTip(b, "Text background: " + bg.ToString().ToLowerInvariant());
+            Avalonia.Automation.AutomationProperties.SetName(b, "Text background " + bg.ToString().ToLowerInvariant());
+            b.Click += (_, _) => { _styleTextBg = style; ApplyStyle(InlineEditSession.RestyleScope.Text); Focus(); };
+            _bgButtons.Add((bg, b));
+            _grpText.Children.Add(b);
+        }
 
-        options.Children.Add(MakeIconButton("IconCopy", "Copy to clipboard (Ctrl+C)", () => CompleteEditing(SelectionAction.Copy)));
-        if (_options.AutoSave)
-            options.Children.Add(MakeIconButton("IconCheck", "Save and finish (Enter)", DefaultAction));
-        else
-            options.Children.Add(MakeIconButton("IconSave", "Save to library (Ctrl+S)", () => CompleteEditing(SelectionAction.Save)));
-        options.Children.Add(MakeIconButton("IconClose", "Cancel (Esc)", Cancel));
+        // spotlight dimming
+        var slider = new Slider { Minimum = 10, Maximum = 90, Value = _styleDimPercent, TickFrequency = 5, IsSnapToTickEnabled = true, Width = 130, VerticalAlignment = VerticalAlignment.Center };
+        Avalonia.Automation.AutomationProperties.SetName(slider, "Dimming");
+        slider.PropertyChanged += (_, e) =>
+        {
+            if (e.Property != Slider.ValueProperty) return;
+            _styleDimPercent = slider.Value;
+            ApplyStyle(InlineEditSession.RestyleScope.Dim);
+        };
+        _grpDim = Row(new TextBlock { Text = "Dimming", FontSize = 12, Foreground = Res<IBrush>("TextSecondaryBrush"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 6, 0) }, slider);
 
-        _toolsBar = MakeBar(new StackPanel());
-        _optionsBar = MakeBar(options);
-        _layer.Children.Add(_toolsBar);
-        _layer.Children.Add(_optionsBar);
+        _hint = new TextBlock { FontSize = 12, Foreground = Res<IBrush>("TextSecondaryBrush"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0) };
+    }
+
+    /// <summary>A preview of a stroke pattern, drawn the way the editor draws it (Avalonia dash lengths are multiples of the thickness).</summary>
+    private static Panel PatternPreview(StrokePattern pattern, double length)
+    {
+        var ink = Res<IBrush>("TextPrimaryBrush") ?? Brushes.White;
+        Avalonia.Controls.Shapes.Line Make(IBrush brush, double thickness, params double[] dashes) => new()
+        {
+            StartPoint = new Point(0, 7), EndPoint = new Point(length, 7), Stroke = brush, StrokeThickness = thickness,
+            StrokeDashArray = dashes.Length == 0 ? null : new Avalonia.Collections.AvaloniaList<double>(dashes),
+            StrokeLineCap = pattern == StrokePattern.Dotted ? PenLineCap.Round : PenLineCap.Flat,
+        };
+
+        var panel = new Panel { Width = length, Height = 14 };
+        switch (pattern)
+        {
+            case StrokePattern.Solid: panel.Children.Add(Make(ink, 2)); break;
+            case StrokePattern.Dashed: panel.Children.Add(Make(ink, 2, 3, 2)); break;
+            case StrokePattern.Dotted: panel.Children.Add(Make(ink, 2, 0.01, 2)); break;
+            case StrokePattern.DashDot: panel.Children.Add(Make(ink, 2, 4, 1.5, 1, 1.5)); break;
+            case StrokePattern.Pixel: panel.Children.Add(Make(ink, 1, 1, 1)); break;
+            case StrokePattern.TwoTone:
+                panel.Children.Add(Make(Brushes.Black, 2, 2.5, 2.5));
+                var white = Make(Brushes.White, 2, 2.5, 2.5);
+                white.StrokeDashOffset = 2.5;
+                panel.Children.Add(white);
+                break;
+        }
+        return panel;
+    }
+
+    private Button BuildLineStyleButton()
+    {
+        _linePreview = new Panel { Width = 44, Height = 14, VerticalAlignment = VerticalAlignment.Center };
+        var button = new Button
+        {
+            Classes = { "secondary" }, Height = 32, MinHeight = 0, Padding = new Thickness(10, 0),
+            Content = new StackPanel
+            {
+                Orientation = Orientation.Horizontal, Spacing = 8,
+                Children = { _linePreview, new Icon { Data = Res<Geometry>("IconChevronDown"), Size = 12, VerticalAlignment = VerticalAlignment.Center } },
+            },
+        };
+        ToolTip.SetTip(button, "Line style");
+        Avalonia.Automation.AutomationProperties.SetName(button, "Line style");
+
+        var list = new StackPanel { Spacing = 2, MinWidth = 170 };
+        var flyout = new Flyout { Content = list };
+        foreach (var pattern in StrokePatterns.All)
+        {
+            var p = pattern;
+            var row = new Button
+            {
+                Classes = { "ghost" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, Padding = new Thickness(10, 6),
+                Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal, Spacing = 12,
+                    Children = { PatternPreview(p, 56), new TextBlock { Text = StrokePatterns.Label(p), VerticalAlignment = VerticalAlignment.Center } },
+                },
+            };
+            Avalonia.Automation.AutomationProperties.SetName(row, StrokePatterns.Label(p));
+            row.Click += (_, _) => { _stylePattern = p; ApplyStyle(InlineEditSession.RestyleScope.Pattern); flyout.Hide(); };
+            _patternRows.Add((p, row));
+            list.Children.Add(row);
+        }
+        flyout.Closed += (_, _) => Focus();
+        // The list opens away from the screen edge: downwards normally, upwards when the bar had to move above the selection.
+        button.Click += (_, _) =>
+        {
+            flyout.Placement = _barBelow ? PlacementMode.Bottom : PlacementMode.Top;
+            UpdateToolSelection();
+            flyout.ShowAt(button);
+        };
+        return button;
+    }
+
+    private readonly List<(StrokePattern Pattern, Button Row)> _patternRows = new();
+
+    /// <summary>Which option groups the tool needs. With the Select tool they follow the selected annotation, so it can still be restyled.</summary>
+    private (bool Color, bool Width, bool Line, bool Head, bool Text, bool Dim, string? Hint) OptionsFor()
+    {
+        var tool = _session!.Tool;
+        if (tool == InlineTool.None)
+        {
+            switch (_session.Selected)
+            {
+                case RectangleAnnotation or EllipseAnnotation: tool = InlineTool.Rectangle; break;
+                case ArrowAnnotation a: tool = a.Head == ArrowHead.None ? InlineTool.Line : InlineTool.Arrow; break;
+                case PenAnnotation: tool = InlineTool.Pen; break;
+                case HighlightAnnotation: tool = InlineTool.Highlight; break;
+                case TextAnnotation: tool = InlineTool.Text; break;
+                case NumberedStepAnnotation: tool = InlineTool.Step; break;
+                case SpotlightAnnotation: tool = InlineTool.Spotlight; break;
+                case null: return (false, false, false, false, false, false, "Click an annotation to edit, drag to move");
+                default: return (false, false, false, false, false, false, "Drag to move or resize, Delete removes it");
+            }
+        }
+
+        return tool switch
+        {
+            InlineTool.Rectangle or InlineTool.Ellipse or InlineTool.Line or InlineTool.Pen => (true, true, true, false, false, false, null),
+            InlineTool.Arrow => (true, true, true, true, false, false, null),
+            InlineTool.Text => (true, true, false, false, true, false, null),
+            InlineTool.Highlight or InlineTool.Step => (true, false, false, false, false, false, null),
+            InlineTool.Spotlight => (false, false, false, false, false, true, null),
+            _ => (false, false, false, false, false, false, "Drag over the area you want to hide"),   // Blur, Pixelate
+        };
+    }
+
+    /// <summary>Shows only the option groups the active tool (or the selected annotation) uses, and re-places the bar when its width changes.</summary>
+    private void RefreshOptions()
+    {
+        if (_optionsPanel is null || _session is null) return;
+        var o = OptionsFor();
+        var key = $"{o.Color}{o.Width}{o.Line}{o.Head}{o.Text}{o.Dim}{o.Hint}{_session.Tool == InlineTool.Text}";
+        if (key == _optionsKey) return;
+        _optionsKey = key;
+
+        _optionsPanel.Children.Clear();
+        void Add(bool show, Control group)
+        {
+            if (!show) return;
+            if (_optionsPanel.Children.Count > 0) _optionsPanel.Children.Add(HSeparator());
+            _optionsPanel.Children.Add(group);
+        }
+        Add(o.Color, _grpColor!); Add(o.Width, _grpWidth!); Add(o.Line, _grpLine!); Add(o.Head, _grpHead!); Add(o.Text, _grpText!); Add(o.Dim, _grpDim!);
+        if (o.Hint is not null) { _hint!.Text = o.Hint; _optionsPanel.Children.Add(_hint); }
+
+        // The width presets are text sizes for the Text tool and stroke widths otherwise.
+        var text = _session.Tool == InlineTool.Text || _session.Selected is TextAnnotation;
+        foreach (var (w, b) in _widthButtons)
+        {
+            var name = w <= 2f ? "Thin" : w <= 4f ? "Medium" : "Thick";
+            var tip = text ? (w <= 2f ? "Small text" : w <= 4f ? "Medium text" : "Large text") : name + " stroke";
+            ToolTip.SetTip(b, tip);
+            Avalonia.Automation.AutomationProperties.SetName(b, tip);
+        }
+        PositionToolbar();
+    }
+
+    private void UpdateLinePreview()
+    {
+        if (_linePreview is null) return;
+        _linePreview.Children.Clear();
+        _linePreview.Children.Add(PatternPreview(_stylePattern, 44));
     }
 
     /// <summary>One column when the selection is tall enough, otherwise two, so the column never sticks out below the selection.</summary>
@@ -734,22 +971,19 @@ internal sealed class RegionOverlayWindow : Window
     {
         if (_toolsBar is null) return;
         if (_toolsBar.Child is Panel old) old.Children.Clear();
-        const double oneColumnHeight = 9 * 34 + 2 * 34 + 14 + 12;
+        // One column whenever the screen is tall enough (it hangs beside the selection, top-aligned), two only on very short screens.
+        const double oneColumnHeight = 14 * 34 + 4 * 11 + 16;
         Panel panel;
-        if (_sel.Height >= oneColumnHeight)
+        if (Bounds.Height >= oneColumnHeight + 16)
         {
             var column = new StackPanel { Orientation = Orientation.Vertical };
-            for (var i = 0; i < _toolControls.Count; i++)
-            {
-                if (i == _toolControls.Count - 2) column.Children.Add(VSeparator());
-                column.Children.Add(_toolControls[i]);
-            }
+            foreach (var c in _toolControls) column.Children.Add(c);
             panel = column;
         }
         else
         {
             var grid = new Avalonia.Controls.Primitives.UniformGrid { Columns = 2 };
-            foreach (var c in _toolControls) grid.Children.Add(c);
+            foreach (var c in _toolControls.OfType<Button>()) grid.Children.Add(c);
             panel = grid;
         }
         _toolsBar.Child = panel;
@@ -758,45 +992,44 @@ internal sealed class RegionOverlayWindow : Window
     private void PositionToolbar()
     {
         if (_toolsBar is null || _optionsBar is null) return;
-        const double gap = 4, edge = 4;
+        const double edge = 4, side = 12, below = 10;
         // Hidden controls measure as zero, so show them before measuring.
         _toolsBar.IsVisible = true;
         _optionsBar.IsVisible = true;
         LayoutTools();
 
-        // Tools column: hugs the selection's right edge (else left, else inside) and is kept no taller than the selection
-        // (wrapping into more columns when needed) so the two bars form a tidy L around the bottom-right corner.
+        // Vertical bar: 12 px beside the selection (right, else left, else inside against its right edge), bottom-aligned with it.
         _toolsBar.MaxHeight = Math.Max(150, Bounds.Height - 2 * edge);
         _toolsBar.Measure(new Size(double.PositiveInfinity, _toolsBar.MaxHeight));
         var v = _toolsBar.DesiredSize;
-        var onRight = _sel.Right + gap + v.Width <= Bounds.Width - edge;
-        var onLeft = !onRight && _sel.Left - gap - v.Width >= edge;
-        double vx = onRight ? _sel.Right + gap
-                  : onLeft ? _sel.Left - gap - v.Width
-                  : Math.Max(edge, _sel.Right - v.Width - gap);
-        // Sit on the selection's bottom edge (flush with the options row below); only a column taller than the selection hangs from its top.
-        var vyWanted = v.Height <= _sel.Height ? _sel.Bottom - v.Height : _sel.Top;
-        var vy = Math.Clamp(vyWanted, edge, Math.Max(edge, Bounds.Height - v.Height - edge));
+        var onRight = _sel.Right + side + v.Width <= Bounds.Width - edge;
+        var onLeft = !onRight && _sel.Left - side - v.Width >= edge;
+        double vx = onRight ? _sel.Right + side
+                  : onLeft ? _sel.Left - side - v.Width
+                  : Math.Max(edge, _sel.Right - v.Width - 6);
+        // Bottom-aligned: the column ends on the selection's bottom edge, so it forms a tidy corner with the horizontal bar under it.
+        var vy = Math.Clamp(_sel.Bottom - v.Height, edge, Math.Max(edge, Bounds.Height - v.Height - edge));
         Canvas.SetLeft(_toolsBar, vx);
         Canvas.SetTop(_toolsBar, vy);
 
-        // Options row: directly under the selection (else above, else inside at the bottom edge). Its right edge lines up with
-        // the outer edge of the tools column when that sits on the right, i.e. flush in the corner.
-        var maxWidth = Math.Min(560, Math.Max(240, Bounds.Width - 2 * edge));
-        _optionsBar.MaxWidth = maxWidth;
-        _optionsBar.Measure(new Size(maxWidth, double.PositiveInfinity));
+        // Horizontal bar: under the selection with its right edge on the selection's right edge; above it when there is no room below
+        // (then the line-style list opens the other way), and inside the selection as a last resort.
+        // The options changed since the last measure: invalidate the whole chain so the new width is really measured, not a cached one.
+        _optionsPanel?.InvalidateMeasure();
+        (_optionsPanel?.Parent as Layoutable)?.InvalidateMeasure();
+        _optionsBar.InvalidateMeasure();
+        _optionsBar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         var h = _optionsBar.DesiredSize;
         double hy;
-        if (_sel.Bottom + gap + h.Height <= Bounds.Height - edge) hy = _sel.Bottom + gap;
-        else if (_sel.Top - gap - h.Height >= edge) hy = _sel.Top - gap - h.Height;
-        else hy = Math.Max(edge, _sel.Bottom - h.Height - gap);
+        if (_sel.Bottom + below + h.Height <= Bounds.Height - edge) { hy = _sel.Bottom + below; _barBelow = true; }
+        else if (_sel.Top - below - h.Height >= edge) { hy = _sel.Top - below - h.Height; _barBelow = false; }
+        else { hy = Math.Max(edge, _sel.Bottom - h.Height - below); _barBelow = false; }
 
-        var anchorRight = onRight ? vx + v.Width : _sel.Right;
-        var hx = Math.Clamp(anchorRight - h.Width, edge, Math.Max(edge, Bounds.Width - h.Width - edge));
-        // Only if the tools column still reaches the options row (very short selections) move the row out of its way.
+        var hx = Math.Clamp(_sel.Right - h.Width, edge, Math.Max(edge, Bounds.Width - h.Width - edge));
+        // If the vertical bar sits in the way (very short selections), move the horizontal one beside it.
         var overlapsVertically = vy + v.Height > hy - 1 && vy < hy + h.Height + 1;
-        if (overlapsVertically && hx + h.Width > vx - gap && hx < vx + v.Width)
-            hx = Math.Max(edge, vx - gap - h.Width);
+        if (overlapsVertically && hx + h.Width > vx - 8 && hx < vx + v.Width)
+            hx = Math.Max(edge, vx - 8 - h.Width);
         Canvas.SetLeft(_optionsBar, hx);
         Canvas.SetTop(_optionsBar, hy);
     }
@@ -807,9 +1040,12 @@ internal sealed class RegionOverlayWindow : Window
         foreach (var (tool, b) in _toolButtons) b.Classes.Set("active", _session.Tool == tool);
         foreach (var (c, b) in _colorButtons) b.BorderBrush = c == _session.Color ? Res<IBrush>("AccentBrush") ?? Brushes.DodgerBlue : Brushes.Transparent;
         foreach (var (w, b) in _widthButtons) b.Classes.Set("active", Math.Abs(w - _session.Stroke) < 0.1f);
+        foreach (var (head, b) in _headButtons) b.Classes.Set("active", head == _styleHead);
+        foreach (var (bg, b) in _bgButtons) b.Classes.Set("active", bg == _styleTextBg);
+        foreach (var (p, row) in _patternRows) row.Classes.Set("active", p == _stylePattern);
         _boldButton?.Classes.Set("active", _styleBold);
-        foreach (var (button, isOn) in _styleChoices) button.Classes.Set("active", isOn());
-        _styleButton?.Classes.Set("active", _stylePattern != StrokePattern.Solid || _styleTextBg != TextBackgroundStyle.None || _styleHead != ArrowHead.End);
+        UpdateLinePreview();
+        RefreshOptions();
     }
 
     private void ApplyStyle(InlineEditSession.RestyleScope scope)
@@ -820,51 +1056,6 @@ internal sealed class RegionOverlayWindow : Window
         _session.RestyleSelected(scope);
         UpdateToolSelection();
         UpdateUndoRedo();
-    }
-
-    /// <summary>The Style button opens a small panel for choosing line pattern, arrow head, text background and spotlight strength directly.</summary>
-    private Button BuildStyleButton()
-    {
-        var panel = new StackPanel { Spacing = 8, Width = 270 };
-        var caption = Res<IBrush>("TextSecondaryBrush");
-
-        void Group<T>(string title, IEnumerable<T> values, Func<T, string> label, Func<T> current, Action<T> set, InlineEditSession.RestyleScope scope)
-        {
-            panel.Children.Add(new TextBlock { Text = title, FontSize = 12, FontWeight = FontWeight.Medium, Foreground = caption });
-            var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
-            foreach (var v in values)
-            {
-                var value = v;
-                var b = new Button { Content = label(v), Classes = { "secondary" }, Padding = new Thickness(10, 3), MinHeight = 28, Margin = new Thickness(0, 0, 6, 6) };
-                b.Click += (_, _) => { set(value); ApplyStyle(scope); };
-                _styleChoices.Add((b, () => EqualityComparer<T>.Default.Equals(current(), value)));
-                wrap.Children.Add(b);
-            }
-            panel.Children.Add(wrap);
-        }
-
-        Group("Line style", StrokePatterns.All, StrokePatterns.Label, () => _stylePattern, v => _stylePattern = v, InlineEditSession.RestyleScope.Pattern);
-        Group("Arrow head", new[] { ArrowHead.None, ArrowHead.End, ArrowHead.Both }, v => v == ArrowHead.None ? "None" : v.ToString(), () => _styleHead, v => _styleHead = v, InlineEditSession.RestyleScope.Head);
-        Group("Text background", new[] { TextBackgroundStyle.None, TextBackgroundStyle.Soft, TextBackgroundStyle.Solid, TextBackgroundStyle.Outline }, v => v.ToString(), () => _styleTextBg, v => _styleTextBg = v, InlineEditSession.RestyleScope.Text);
-
-        panel.Children.Add(new TextBlock { Text = "Spotlight dimming", FontSize = 12, FontWeight = FontWeight.Medium, Foreground = caption });
-        var slider = new Slider { Minimum = 10, Maximum = 90, Value = _styleDimPercent, TickFrequency = 5, IsSnapToTickEnabled = true };
-        Avalonia.Automation.AutomationProperties.SetName(slider, "Spotlight dimming");
-        slider.PropertyChanged += (_, e) =>
-        {
-            if (e.Property != Slider.ValueProperty) return;
-            _styleDimPercent = slider.Value;
-            ApplyStyle(InlineEditSession.RestyleScope.Dim);
-        };
-        panel.Children.Add(slider);
-
-        var flyout = new Flyout { Content = panel, Placement = PlacementMode.Top };
-        flyout.Closed += (_, _) => Focus();
-        var button = new Button { Classes = { "icon" }, Content = new Icon { Data = Res<Geometry>("IconStyle"), Size = 18 }, Width = 32, Height = 32 };
-        ToolTip.SetTip(button, "Style: line pattern, arrow head, text background, spotlight");
-        Avalonia.Automation.AutomationProperties.SetName(button, "Style options");
-        button.Click += (_, _) => { UpdateToolSelection(); flyout.ShowAt(button); };
-        return button;
     }
 
     private void UpdateUndoRedo()
@@ -891,6 +1082,10 @@ internal sealed class OverlayCanvas : Control
     public Bitmap Frame { get; }
     public Point? Cursor { get; set; }
     public bool ShowHint { get; set; } = true;
+
+    /// <summary>The selection accent: the colour theme's Dark accent (the overlay always sits on a dimmed screen), blue if it cannot be read.</summary>
+    private static Color OverlayAccent =>
+        Application.Current is { } app && app.TryGetResource("AccentColor", Avalonia.Styling.ThemeVariant.Dark, out var v) && v is Color c ? c : Color.FromRgb(124, 147, 245);
     public bool ShowHandles { get; set; }
     public Point? SelectionA => _a;
     public Point? SelectionB => _b;
@@ -924,13 +1119,13 @@ internal sealed class OverlayCanvas : Control
             if (_session?.View is { } view)
                 context.DrawImage(view, new Rect(0, 0, view.PixelSize.Width, view.PixelSize.Height), sel);
 
-            context.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromRgb(124, 147, 245)), 1.5), sel);
+            context.DrawRectangle(null, new Pen(new SolidColorBrush(OverlayAccent), 1.5), sel);
 
             if (_session?.SelectedBounds is { } sb && _session.Width > 0)
             {
                 var ks = sel.Width / _session.Width;
                 var ar = new Rect(sel.X + (sb.X - _session.Origin.X) * ks, sel.Y + (sb.Y - _session.Origin.Y) * ks, sb.Width * ks, sb.Height * ks).Inflate(2);
-                var accent = new SolidColorBrush(Color.FromRgb(124, 147, 245));
+                var accent = new SolidColorBrush(OverlayAccent);
                 context.DrawRectangle(null, new Pen(accent, 1, DashStyle.Dash), ar);
                 if (_session.Selected is { CanResize: true })
                     foreach (var pt in new[] { ar.TopLeft, new Point(ar.Center.X, ar.Top), ar.TopRight, new Point(ar.Right, ar.Center.Y), ar.BottomRight, new Point(ar.Center.X, ar.Bottom), ar.BottomLeft, new Point(ar.Left, ar.Center.Y) })
@@ -939,7 +1134,7 @@ internal sealed class OverlayCanvas : Control
 
             if (ShowHandles && _session is not null)
             {
-                var hp = new Pen(new SolidColorBrush(Color.FromRgb(124, 147, 245)), 1.5);
+                var hp = new Pen(new SolidColorBrush(OverlayAccent), 1.5);
                 foreach (var pt in new[] { sel.TopLeft, new Point(sel.Center.X, sel.Top), sel.TopRight, new Point(sel.Right, sel.Center.Y), sel.BottomRight, new Point(sel.Center.X, sel.Bottom), sel.BottomLeft, new Point(sel.Left, sel.Center.Y) })
                     context.DrawRectangle(Brushes.White, hp, new Rect(pt.X - 4, pt.Y - 4, 8, 8), 2, 2);
             }

@@ -51,6 +51,7 @@ public partial class App : Application
             var theme = _services.GetRequiredService<ThemeService>();
             var settings = _services.GetRequiredService<IApplicationSettingsService>();
             theme.Apply(settings.Current.Theme);
+            theme.ApplyPalette(settings.Current.ColorTheme);
             theme.ApplyMotion(settings.Current.ReduceMotion);
 
             var main = _services.GetRequiredService<MainViewModel>();

@@ -25,6 +25,7 @@ public class SnaplyDbContext : DbContext
             e.HasKey(x => x.Id);
             e.Property(x => x.FilePath).IsRequired().HasMaxLength(1024);
             e.Property(x => x.ThumbnailPath).HasMaxLength(1024);
+            e.Property(x => x.SourceTitle).HasMaxLength(Snaply.Core.Models.Screenshot.MaxSourceTitleLength);
             e.Property(x => x.FileName).IsRequired().HasMaxLength(260);
             e.Property(x => x.Format).IsRequired().HasMaxLength(8);
             e.Property(x => x.CreatedAt).HasConversion(utc);

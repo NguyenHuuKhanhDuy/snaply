@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Text;
 using System.Xml.Linq;
 
+using Snaply.App.Themes;
+
 namespace Snaply.App.Tests;
 
 /// <summary>WCAG contrast checks over the design tokens in Themes/Tokens.axaml for both themes.</summary>
@@ -90,30 +92,40 @@ public class ContrastTests
         return (hi + 0.05) / (lo + 0.05);
     }
 
+    /// <summary>The effective tokens for a colour theme: the base tokens with the theme's overrides on top.</summary>
+    private static Dictionary<string, (byte R, byte G, byte B)> Effective(string theme, ColorPalette palette)
+    {
+        var colors = Load(theme);
+        foreach (var (key, hex) in palette.For(theme == "Dark")) colors[key + "Color"] = Parse(hex);
+        return colors;
+    }
+
     private static List<(string Theme, Pair Pair, double Ratio)> Evaluate()
     {
         var all = new List<(string, Pair, double)>();
-        foreach (var theme in new[] { "Light", "Dark" })
-        {
-            var colors = Load(theme);
-            foreach (var p in Pairs) all.Add((theme, p, Ratio(colors[p.Foreground], colors[p.Background])));
-        }
+        foreach (var palette in ColorPalettes.All)
+            foreach (var theme in new[] { "Light", "Dark" })
+            {
+                var colors = Effective(theme, palette);
+                foreach (var p in Pairs) all.Add(($"{theme} / {palette.Id}", p, Ratio(colors[p.Foreground], colors[p.Background])));
+            }
         return all;
     }
 
-    private static string Key(string theme, Pair p) => $"{theme}:{p.Foreground}/{p.Background}";
+    private static string Key(string theme, Pair p) => $"{theme.Replace(" / ", ":")}:{p.Foreground}/{p.Background}";
 
     [Fact]
     public void Contrast_report_is_written()
     {
-        var sb = new StringBuilder("# Contrast report\n\nGenerated from `src/Snaply.App/Themes/Tokens.axaml` (WCAG 2.x). Text needs 4.5:1, UI components 3:1.\n\n");
-        sb.AppendLine("| Theme | Foreground | Background | Use | Ratio | Needs | Result |\n|---|---|---|---|---|---|---|");
+        var sb = new StringBuilder("# Contrast report\n\nGenerated from `src/Snaply.App/Themes/Tokens.axaml` plus every colour theme in `ColorPalettes.cs` (WCAG 2.x). Text needs 4.5:1, UI components 3:1.\n\n");
+        sb.AppendLine("| Mode / colour theme | Foreground | Background | Use | Ratio | Needs | Result |\n|---|---|---|---|---|---|---|");
         foreach (var (theme, p, ratio) in Evaluate())
             sb.AppendLine($"| {theme} | {p.Foreground} | {p.Background} | {p.Use} | {ratio:0.00} | {p.Required:0.0} | {(ratio >= p.Required ? "pass" : "**FAIL**")} |");
 
         Directory.CreateDirectory(UiShots.OutputRoot);
         File.WriteAllText(Path.Combine(UiShots.OutputRoot, "contrast.md"), sb.ToString());
-        Assert.Contains("| Light |", sb.ToString());
+        Assert.Contains("| Light / default |", sb.ToString());
+        Assert.Contains("| Dark / rose |", sb.ToString());
     }
 
     [Fact]

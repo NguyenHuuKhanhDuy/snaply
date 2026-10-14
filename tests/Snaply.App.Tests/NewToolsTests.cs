@@ -307,3 +307,59 @@ public class DashedShapesAppTests
         Assert.True(((EllipseAnnotation)s.Annotations.Last()).Dashed);
     }
 }
+
+public class HighlightColourTests
+{
+    [AvaloniaFact]
+    public void The_overlay_switches_to_yellow_for_highlight_until_a_colour_is_picked_and_back_afterwards()
+    {
+        using var s = new InlineEditSession(UiFixture.Sample(0, 800, 600), new PixelRect(0, 0, 800, 600));
+        Assert.Equal(Colors.Red, s.Color);
+        s.Tool = InlineTool.Highlight;
+        Assert.Equal(Colors.Yellow, s.Color);                                              // the active swatch matches what is drawn
+        s.Preview(new DocPoint(100, 100), new DocPoint(200, 140), false);
+        s.Commit(new DocPoint(100, 100), new DocPoint(200, 140), false);
+        Assert.Equal(Colors.Yellow, ((HighlightAnnotation)s.Annotations.Last()).Color);
+
+        s.Tool = InlineTool.Rectangle;
+        Assert.Equal(Colors.Red, s.Color);                                                 // leaving Highlight restores the default
+    }
+
+    [AvaloniaFact]
+    public void An_explicit_colour_choice_is_never_overridden()
+    {
+        using var s = new InlineEditSession(UiFixture.Sample(0, 800, 600), new PixelRect(0, 0, 800, 600));
+        s.Color = Colors.Red; s.ColorChosen = true;                                        // the user clicks red
+        s.Tool = InlineTool.Highlight;
+        Assert.Equal(Colors.Red, s.Color);
+        s.Preview(new DocPoint(100, 100), new DocPoint(200, 140), false);
+        s.Commit(new DocPoint(100, 100), new DocPoint(200, 140), false);
+        Assert.Equal(Colors.Red, ((HighlightAnnotation)s.Annotations.Last()).Color);
+
+        s.Color = Colors.Blue;
+        s.Tool = InlineTool.Rectangle;
+        Assert.Equal(Colors.Blue, s.Color);
+    }
+
+    [AvaloniaFact(Timeout = 60_000)]
+    public async Task The_editor_selects_the_yellow_swatch_for_highlight_and_respects_a_picked_colour()
+    {
+        using var fx = await UiFixture.CreateAsync(populated: true, updateAvailable: false);
+        using var e = fx.Services.GetRequiredService<EditorViewModel>();
+        await e.LoadAsync(fx.ScreenshotIds[1]);
+        e.Tool = EditorTool.Rectangle;
+        Assert.Equal(Colors.Red, e.SelectedColor.Argb);
+
+        e.Tool = EditorTool.Highlight;
+        Assert.Equal(Colors.Yellow, e.SelectedColor.Argb);
+        Assert.True(e.SelectedColor.IsSelected);
+        Assert.Equal(Colors.Yellow, Assert.IsType<HighlightAnnotation>(e.CreateFromDrag(new DocPoint(1, 1), new DocPoint(50, 30))).Color);
+        e.Tool = EditorTool.Rectangle;
+        Assert.Equal(Colors.Red, e.SelectedColor.Argb);
+
+        e.PickColorCommand.Execute(e.Colors.First(c => c.Argb == Colors.Red));            // explicit red
+        e.Tool = EditorTool.Highlight;
+        Assert.Equal(Colors.Red, e.SelectedColor.Argb);
+        Assert.Equal(Colors.Red, Assert.IsType<HighlightAnnotation>(e.CreateFromDrag(new DocPoint(1, 1), new DocPoint(50, 30))).Color);
+    }
+}

@@ -103,6 +103,10 @@ namespace Snaply.Infrastructure.Persistence.Migrations
                     b.Property<string>("OcrText")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("SourceTitle")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ThumbnailPath")
                         .HasMaxLength(1024)
                         .HasColumnType("TEXT");

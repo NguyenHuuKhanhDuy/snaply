@@ -5,6 +5,8 @@ public sealed class AppSettings
     public const int CurrentSchemaVersion = 1;
 
     public ThemeMode Theme { get; set; } = ThemeMode.System;
+    /// <summary>Colour theme id (see ColorPalettes); unknown or empty means the default blue.</summary>
+    public string ColorTheme { get; set; } = "default";
     public string? SaveDirectory { get; set; }
     public ImageFormat DefaultFormat { get; set; } = ImageFormat.Png;
     public bool CopyToClipboardAfterCapture { get; set; }
@@ -23,6 +25,8 @@ public sealed class AppSettings
     public bool RunInBackground { get; set; } = true;
     /// <summary>Start Snaply (hidden in the tray) when the user signs in to Windows. Off unless the user turns it on.</summary>
     public bool StartWithWindows { get; set; }
+    /// <summary>Store the title of the captured window with each screenshot (Windows only, local only). On by default.</summary>
+    public bool RememberSourceWindow { get; set; } = true;
     /// <summary>The user hid the getting-started checklist on Home.</summary>
     public bool OnboardingDismissed { get; set; }
     public GalleryViewMode GalleryViewMode { get; set; } = GalleryViewMode.Grid;
@@ -42,11 +46,11 @@ public sealed class AppSettings
 
     public AppSettings Clone() => new()
     {
-        Theme = Theme, SaveDirectory = SaveDirectory, DefaultFormat = DefaultFormat,
+        Theme = Theme, ColorTheme = ColorTheme, SaveDirectory = SaveDirectory, DefaultFormat = DefaultFormat,
         CopyToClipboardAfterCapture = CopyToClipboardAfterCapture, SaveToLibraryAfterCapture = SaveToLibraryAfterCapture, EditAfterSelection = EditAfterSelection,
         OpenEditorAfterCapture = OpenEditorAfterCapture, DefaultCaptureTool = DefaultCaptureTool, FullScreenTarget = FullScreenTarget,
         CaptureDelaySeconds = CaptureDelaySeconds, ReduceMotion = ReduceMotion,
-        RunInBackground = RunInBackground, StartWithWindows = StartWithWindows, OnboardingDismissed = OnboardingDismissed, GalleryViewMode = GalleryViewMode, AutoCheckUpdates = AutoCheckUpdates, LastUpdateCheckUtc = LastUpdateCheckUtc,
+        RunInBackground = RunInBackground, StartWithWindows = StartWithWindows, RememberSourceWindow = RememberSourceWindow, OnboardingDismissed = OnboardingDismissed, GalleryViewMode = GalleryViewMode, AutoCheckUpdates = AutoCheckUpdates, LastUpdateCheckUtc = LastUpdateCheckUtc,
         OcrLanguages = new List<string>(OcrLanguages), DisabledRedactionTypes = new List<string>(DisabledRedactionTypes), Hotkeys = new Dictionary<string, string>(Hotkeys),
     };
 }

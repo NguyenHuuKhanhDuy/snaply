@@ -6,10 +6,10 @@
              x:DataType="vm:SettingsViewModel">
   <Grid RowDefinitions="Auto,*">
     <!-- Header: title, search and (narrow windows) a section picker -->
-    <Grid Margin="32,24,32,10" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-      <StackPanel Spacing="4" VerticalAlignment="Center">
-        <TextBlock Text="Settings" Classes="title" />
-        <TextBlock Text="Changes are saved automatically." Classes="secondary" />
+    <Grid Margin="32,26,32,14" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+      <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+        <TextBlock Text="Settings" Classes="title" VerticalAlignment="Center" />
+        <TextBlock Text="Changes save automatically" Classes="caption secondary" VerticalAlignment="Bottom" Margin="0,0,0,4" />
       </StackPanel>
       <ComboBox x:Name="SectionPicker" Grid.Column="1" ItemsSource="{Binding Sections}" MinWidth="150" IsVisible="False" VerticalAlignment="Center"
                 AutomationProperties.Name="Jump to section">
@@ -17,7 +17,7 @@
           <DataTemplate x:DataType="vm:SettingsSectionItem"><TextBlock Text="{Binding Title}" /></DataTemplate>
         </ComboBox.ItemTemplate>
       </ComboBox>
-      <TextBox x:Name="SettingsSearch" Grid.Column="2" Width="260" Watermark="Search settings" VerticalAlignment="Center" AutomationProperties.Name="Search settings">
+      <TextBox x:Name="SettingsSearch" Grid.Column="2" Width="300" Watermark="Search settings" VerticalAlignment="Center" AutomationProperties.Name="Search settings">
         <TextBox.InnerLeftContent>
           <c:Icon Data="{DynamicResource IconSearch}" Size="16" Margin="10,0,0,0" VerticalAlignment="Center" />
         </TextBox.InnerLeftContent>
@@ -31,18 +31,15 @@
 
     <Grid Grid.Row="1" ColumnDefinitions="Auto,*">
       <!-- Section list (wide windows) -->
-      <Border x:Name="SectionNav" Width="220" Padding="20,8,8,16" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+      <Border x:Name="SectionNav" Width="200" Padding="32,6,8,16">
         <ItemsControl ItemsSource="{Binding Sections}">
           <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:SettingsSectionItem">
-              <Button Classes="nav" Classes.active="{Binding IsActive}" IsVisible="{Binding IsVisible}"
+              <Button Classes="subnav" Classes.active="{Binding IsActive}" IsVisible="{Binding IsVisible}"
                       Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).GoToSectionCommand}" CommandParameter="{Binding Key}"
                       AutomationProperties.Name="{Binding Title}">
-                <StackPanel Orientation="Horizontal" Spacing="12">
-                  <c:Icon Data="{Binding Icon}" Size="17" />
-                  <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
-                </StackPanel>
+                <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
               </Button>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
@@ -52,32 +49,62 @@
   <ScrollViewer x:Name="SettingsScroll" Grid.Column="1" HorizontalScrollBarVisibility="Disabled">
     <StackPanel x:Name="SettingsContent" MaxWidth="820" Margin="28,8,32,40" Spacing="28" HorizontalAlignment="Left">
 
+      <!-- General -->
+      <c:SectionCard x:Name="GeneralSection" Title="General">
+        <StackPanel>
+          <c:SettingsRow Title="Keep running in the background" Description="Closing the window keeps Snaply in the tray so shortcuts still work.">
+            <ToggleSwitch IsChecked="{Binding RunInBackground}" OnContent="" OffContent="" AutomationProperties.Name="Keep running in the background" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <Grid ColumnDefinitions="*,Auto" Margin="0,12">
+            <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,24,0">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Start when I sign in" FontWeight="Medium" VerticalAlignment="Center" />
+                <Border Classes="pill" IsVisible="{Binding !StartupAvailable}"><TextBlock Text="Installed app only" Classes="caption secondary" /></Border>
+              </StackPanel>
+              <TextBlock Text="{Binding StartupNote}" Classes="caption secondary" TextWrapping="Wrap" />
+            </StackPanel>
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding StartWithWindows}" IsEnabled="{Binding StartupAvailable}" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Start Snaply when I sign in" />
+          </Grid>
+        </StackPanel>
+      </c:SectionCard>
+
       <!-- Appearance -->
-      <c:SectionCard x:Name="AppearanceSection" Title="Appearance" Description="Choose how Snaply looks. System follows your operating system.">
+      <c:SectionCard x:Name="AppearanceSection" Title="Appearance">
         <StackPanel>
           <c:SettingsRow Title="Theme">
-            <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="8" Padding="3">
+            <Border Background="{DynamicResource BackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="3">
               <StackPanel Orientation="Horizontal" Spacing="2">
-                <ToggleButton Classes="segment" IsChecked="{Binding IsLight}" AutomationProperties.Name="Light theme">
-                  <StackPanel Orientation="Horizontal" Spacing="7"><c:Icon Data="{DynamicResource IconSun}" Size="15" /><TextBlock Text="Light" /></StackPanel>
-                </ToggleButton>
-                <ToggleButton Classes="segment" IsChecked="{Binding IsDark}" AutomationProperties.Name="Dark theme">
-                  <StackPanel Orientation="Horizontal" Spacing="7"><c:Icon Data="{DynamicResource IconMoon}" Size="15" /><TextBlock Text="Dark" /></StackPanel>
-                </ToggleButton>
-                <ToggleButton Classes="segment" IsChecked="{Binding IsSystem}" AutomationProperties.Name="System theme">
-                  <StackPanel Orientation="Horizontal" Spacing="7"><c:Icon Data="{DynamicResource IconAuto}" Size="15" /><TextBlock Text="System" /></StackPanel>
-                </ToggleButton>
+                <ToggleButton Classes="segment" IsChecked="{Binding IsLight}" AutomationProperties.Name="Light theme"><TextBlock Text="Light" /></ToggleButton>
+                <ToggleButton Classes="segment" IsChecked="{Binding IsDark}" AutomationProperties.Name="Dark theme"><TextBlock Text="Dark" /></ToggleButton>
+                <ToggleButton Classes="segment" IsChecked="{Binding IsSystem}" AutomationProperties.Name="System theme"><TextBlock Text="System" /></ToggleButton>
               </StackPanel>
             </Border>
           </c:SettingsRow>
           <Border Classes="divider" />
-          <c:SettingsRow Title="Keep running in the background" Description="Closing the window hides Snaply in the system tray so your keyboard shortcuts keep working. Use the tray menu to quit.">
-            <ToggleSwitch IsChecked="{Binding RunInBackground}" OnContent="" OffContent="" AutomationProperties.Name="Keep running in the background" />
-          </c:SettingsRow>
-          <Border Classes="divider" />
-          <c:SettingsRow Title="Start when I sign in" Description="{Binding StartupNote}">
-            <ToggleSwitch IsChecked="{Binding StartWithWindows}" IsEnabled="{Binding StartupAvailable}" OnContent="" OffContent="" AutomationProperties.Name="Start Snaply when I sign in" />
-          </c:SettingsRow>
+          <Grid ColumnDefinitions="*,Auto" Margin="0,8">
+            <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,24,0">
+              <TextBlock Text="Accent colour" FontWeight="Medium" />
+              <TextBlock Classes="caption secondary" TextWrapping="Wrap">
+                <Run Text="Used for the capture button, selection and focus. " /><Run Text="{Binding SelectedColorThemeName}" Foreground="{DynamicResource TextPrimaryBrush}" />
+              </TextBlock>
+            </StackPanel>
+            <ItemsControl Grid.Column="1" ItemsSource="{Binding ColorThemes}" VerticalAlignment="Center">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel MaxWidth="340" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ColorThemeOption">
+                  <Button Classes="dot" Width="44" Height="44"
+                          Command="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).PickColorThemeCommand}" CommandParameter="{Binding}"
+                          ToolTip.Tip="{Binding Name}" AutomationProperties.Name="{Binding Name, StringFormat='Accent colour {0}'}">
+                    <Panel Width="32" Height="32">
+                      <Ellipse Width="32" Height="32" Stroke="{Binding Brush}" StrokeThickness="2" IsVisible="{Binding IsSelected}" />
+                      <Ellipse Width="24" Height="24" Fill="{Binding Brush}" />
+                    </Panel>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Grid>
           <Border Classes="divider" />
           <c:SettingsRow Title="Reduce motion" Description="Turns off sliding and fading animations.">
             <ToggleSwitch IsChecked="{Binding ReduceMotion}" OnContent="" OffContent="" AutomationProperties.Name="Reduce motion" />
@@ -88,12 +115,17 @@
       <!-- Capture -->
       <c:SectionCard x:Name="CaptureSection" Title="Capture" Description="What happens after you take a screenshot.">
         <StackPanel>
-          <c:SettingsRow Title="Save location" Description="{Binding SaveDirectory}">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button Classes="ghost" Content="Use default" Command="{Binding ResetDirectoryCommand}" IsEnabled="{Binding !UsesDefaultDirectory}" />
-              <Button Classes="secondary" Content="Choose folder…" Command="{Binding ChooseDirectoryCommand}" />
+          <Grid ColumnDefinitions="*,Auto" Margin="0,12">
+            <StackPanel Spacing="3" VerticalAlignment="Center" Margin="0,0,24,0">
+              <TextBlock Text="Save location" FontWeight="Medium" />
+              <TextBlock Text="{Binding SaveDirectory}" FontFamily="{DynamicResource MonoFont}" Classes="caption secondary" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SaveDirectory}" />
             </StackPanel>
-          </c:SettingsRow>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Button Classes="ghost" Content="Use default" Command="{Binding ResetDirectoryCommand}" IsVisible="{Binding !UsesDefaultDirectory}" />
+              <Button Classes="secondary" Content="Open folder" Command="{Binding OpenScreenshotFolderCommand}" />
+              <Button Classes="secondary" Content="Change…" Command="{Binding ChooseDirectoryCommand}" />
+            </StackPanel>
+          </Grid>
           <TextBlock Text="{Binding CaptureError}" Classes="caption error" IsVisible="{Binding CaptureError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Margin="0,0,0,10" />
           <Border Classes="divider" />
           <c:SettingsRow Title="Image format" Description="Used for new captures and edited copies.">
@@ -112,6 +144,10 @@
             <ComboBox ItemsSource="{x:Static vm:SettingsViewModel.DefaultToolOptions}" SelectedItem="{Binding DefaultTool}" MinWidth="150" AutomationProperties.Name="Default capture tool">
               <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:ToolChoice"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate>
             </ComboBox>
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Remember the window" Description="Save the title of the window you captured (for example the page or document name) so you can search for it later. It stays on this device and is never part of a redacted copy. Windows only.">
+            <ToggleSwitch IsChecked="{Binding RememberSourceWindow}" OnContent="" OffContent="" AutomationProperties.Name="Remember the captured window" />
           </c:SettingsRow>
           <Border Classes="divider" />
           <c:SettingsRow Title="Copy to clipboard" Description="Also place each capture on the clipboard.">

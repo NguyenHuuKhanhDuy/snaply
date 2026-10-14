@@ -6,7 +6,6 @@
              RequestedThemeVariant="Default">
 
   <Application.DataTemplates>
-    <DataTemplate DataType="vm:HomeViewModel"><views:HomePage /></DataTemplate>
     <DataTemplate DataType="vm:GalleryViewModel"><views:GalleryPage /></DataTemplate>
     <DataTemplate DataType="vm:TagsViewModel"><views:TagsPage /></DataTemplate>
     <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsPage /></DataTemplate>

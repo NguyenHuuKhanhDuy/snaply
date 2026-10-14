@@ -30,9 +30,25 @@
       <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
     </Style>
+
+    <!-- Quick actions appear on hover and while the card has keyboard focus or is selected -->
+    <Style Selector="Border.actions"><Setter Property="Opacity" Value="0" /></Style>
+    <Style Selector="Button.tile:pointerover Border.actions, Button.tile.focused Border.actions, Button.tile.selected Border.actions, Border.actions:focus-within">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.tile:pointerover Border.favbadge, Button.tile.focused Border.favbadge"><Setter Property="Opacity" Value="0" /></Style>
+    <Style Selector="TextBlock.hoverOnly"><Setter Property="Opacity" Value="0" /></Style>
+    <Style Selector="Button.tile:pointerover TextBlock.hoverOnly, Button.tile.focused TextBlock.hoverOnly"><Setter Property="Opacity" Value="1" /></Style>
+    <Style Selector="Button.qa">
+      <Setter Property="Width" Value="28" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
   </UserControl.Styles>
   <Button x:Name="Root" Classes="tile" Classes.selected="{Binding IsSelected}" Classes.checked="{Binding IsChecked}" Classes.focused="{Binding IsFocusedItem}"
-          AutomationProperties.Name="{Binding FileName}"
+          AutomationProperties.Name="{Binding Title}"
           ToolTip.Tip="{Binding FileName}">
     <Grid RowDefinitions="Auto,Auto">
       <Border Height="138" CornerRadius="7,7,0,0" ClipToBounds="True" Background="{DynamicResource SurfaceAltBrush}">
@@ -42,7 +58,7 @@
             <c:Icon Data="{DynamicResource IconImageOff}" Size="26" HorizontalAlignment="Center" />
             <TextBlock Text="File missing" Classes="caption secondary" HorizontalAlignment="Center" />
           </StackPanel>
-          <Border IsVisible="{Binding IsFavorite}" Background="#99000000" CornerRadius="12" Width="24" Height="24" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8">
+          <Border Classes="favbadge" IsVisible="{Binding IsFavorite}" Background="#99000000" CornerRadius="12" Width="24" Height="24" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8">
             <c:Icon Data="{DynamicResource IconStar}" Size="13" Stroke="#FFD60A" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Border>
           <Border Background="#99000000" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8">
@@ -52,12 +68,30 @@
                   AutomationProperties.Name="Select screenshot" ToolTip.Tip="Select">
             <c:Icon Data="{DynamicResource IconCheck}" Size="14" Stroke="White" IsVisible="{Binding IsChecked}" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
+
+          <!-- Quick actions -->
+          <Border Classes="actions" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Padding="3" CornerRadius="8"
+                  Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+              <Button x:Name="CopyButton" Classes="icon qa" AutomationProperties.Name="Copy to clipboard" ToolTip.Tip="Copy to clipboard">
+                <c:Icon Data="{DynamicResource IconCopy}" Size="15" />
+              </Button>
+              <Button x:Name="FavoriteButton" Classes="icon qa" Classes.active="{Binding IsFavorite}" AutomationProperties.Name="Toggle favorite" ToolTip.Tip="Favorite">
+                <c:Icon Data="{DynamicResource IconStar}" Size="15" />
+              </Button>
+              <Button x:Name="MoreButton" Classes="icon qa" AutomationProperties.Name="More actions" ToolTip.Tip="More actions">
+                <c:Icon Data="{DynamicResource IconMore}" Size="15" />
+              </Button>
+            </StackPanel>
+          </Border>
         </Grid>
       </Border>
       <StackPanel Grid.Row="1" Margin="12,10,12,12" Spacing="2" HorizontalAlignment="Stretch">
-        <TextBlock Text="{Binding FileName}" FontWeight="Medium" TextTrimming="CharacterEllipsis" HorizontalAlignment="Left" />
-        <TextBlock Text="{Binding Subtitle}" Classes="caption secondary" TextTrimming="CharacterEllipsis" HorizontalAlignment="Left" />
-        <TextBlock Text="{Binding CreatedText}" Classes="caption tertiary" TextTrimming="CharacterEllipsis" HorizontalAlignment="Left" />
+        <TextBlock Text="{Binding Title}" FontWeight="Medium" TextTrimming="CharacterEllipsis" HorizontalAlignment="Left" />
+        <StackPanel Orientation="Horizontal">
+          <TextBlock Text="{Binding MetaText}" Classes="caption secondary" />
+          <TextBlock Text="{Binding SizeText, StringFormat=' · {0}'}" Classes="caption secondary hoverOnly" />
+        </StackPanel>
       </StackPanel>
     </Grid>
   </Button>

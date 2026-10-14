@@ -21,7 +21,7 @@ public sealed class ScreenshotLibrary : IScreenshotLibrary
         _repo = repo; _storage = storage; _thumbs = thumbs; _settings = settings; _paths = paths; _log = log;
     }
 
-    public async Task<Result<Screenshot>> AddAsync(RawImage image, CaptureMethod method, CancellationToken ct = default)
+    public async Task<Result<Screenshot>> AddAsync(RawImage image, CaptureMethod method, string? sourceTitle = null, CancellationToken ct = default)
     {
         byte[] data;
         try { data = ImageCodec.Encode(image, _settings.Current.DefaultFormat); }
@@ -30,10 +30,10 @@ public sealed class ScreenshotLibrary : IScreenshotLibrary
             _log.LogError(ex, "Encoding failed");
             return Result<Screenshot>.Fail(ErrorCode.Failed, "The image could not be encoded.");
         }
-        return await AddEncodedAsync(data, ImageCodec.Extension(_settings.Current.DefaultFormat), image.Width, image.Height, method, ct).ConfigureAwait(false);
+        return await AddEncodedAsync(data, ImageCodec.Extension(_settings.Current.DefaultFormat), image.Width, image.Height, method, sourceTitle, ct).ConfigureAwait(false);
     }
 
-    public async Task<Result<Screenshot>> AddEncodedAsync(byte[] data, string extension, int width, int height, CaptureMethod method, CancellationToken ct = default)
+    public async Task<Result<Screenshot>> AddEncodedAsync(byte[] data, string extension, int width, int height, CaptureMethod method, string? sourceTitle = null, CancellationToken ct = default)
     {
         var format = ImageCodec.FormatFromExtension(extension);
         if (format is null) return Result<Screenshot>.Fail(ErrorCode.InvalidInput, "Unsupported image format.");
@@ -59,6 +59,7 @@ public sealed class ScreenshotLibrary : IScreenshotLibrary
                 Format = ImageCodec.Extension(format.Value),
                 FileSize = saved.Value.Size,
                 CreatedByCaptureMethod = method,
+                SourceTitle = NormalizeTitle(sourceTitle),
             };
             var added = await _repo.AddAsync(shot, ct).ConfigureAwait(false);
             return Result<Screenshot>.Ok(added);
@@ -141,5 +142,13 @@ public sealed class ScreenshotLibrary : IScreenshotLibrary
         foreach (var f in verification.OrphanImageFiles.Concat(verification.OrphanThumbnails))
             if (ImageStorageService.TryDelete(f)) deleted++;
         return Task.FromResult(deleted);
+    }
+
+    /// <summary>Trims the title, drops empty ones and limits the length.</summary>
+    internal static string? NormalizeTitle(string? title)
+    {
+        var t = title?.Trim();
+        if (string.IsNullOrEmpty(t)) return null;
+        return t.Length > Screenshot.MaxSourceTitleLength ? t[..Screenshot.MaxSourceTitleLength] : t;
     }
 }

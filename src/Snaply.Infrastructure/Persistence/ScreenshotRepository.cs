@@ -44,7 +44,9 @@ public sealed class ScreenshotRepository : IScreenshotRepository
         if (!string.IsNullOrWhiteSpace(f.Search))
         {
             var pattern = "%" + EscapeLike(f.Search.Trim()) + "%";
-            q = q.Where(x => EF.Functions.Like(x.FileName, pattern, "\\") || (x.OcrText != null && EF.Functions.Like(x.OcrText, pattern, "\\")));
+            q = q.Where(x => EF.Functions.Like(x.FileName, pattern, "\\")
+                || (x.SourceTitle != null && EF.Functions.Like(x.SourceTitle, pattern, "\\"))
+                || (x.OcrText != null && EF.Functions.Like(x.OcrText, pattern, "\\")));
         }
         return q;
     }

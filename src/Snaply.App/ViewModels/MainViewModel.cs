@@ -10,7 +10,8 @@ using Snaply.Core.Interfaces;
 
 namespace Snaply.App.ViewModels;
 
-public enum NavDestination { Home, All, Favorites, Tags, Settings }
+/// <summary><c>Home</c> and <c>All</c> are the former pages; they now open the Library and exist only so older call sites keep working.</summary>
+public enum NavDestination { Library = 0, Favorites = 1, Tags = 2, Settings = 3, Home = Library, All = Library }
 
 public sealed partial class NavItemViewModel : ObservableObject
 {
@@ -49,10 +50,11 @@ public sealed partial class MainViewModel : ObservableObject
         Updates.PrepareForRestart = () => CloseEditorAsync(restore: false);
 
         _home = services.GetRequiredService<HomeViewModel>();
-        _home.NavigateTo = Navigate;
+        _home.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(HomeViewModel.RegionShortcut)) OnPropertyChanged(nameof(RegionShortcut)); };
         _home.OpenSettingsSection = section => Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = OpenSettingsAtAsync(section));
         _all = services.GetRequiredService<GalleryViewModel>();
-        _all.Configure(GalleryMode.All, "All Screenshots");
+        _all.Header = _home;
+        _all.Configure(GalleryMode.All, "Library");
         _favorites = services.GetRequiredService<GalleryViewModel>();
         _favorites.Configure(GalleryMode.Favorites, "Favorites");
         _tags = services.GetRequiredService<TagsViewModel>();
@@ -60,8 +62,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         NavItems = new ObservableCollection<NavItemViewModel>
         {
-            new(NavDestination.Home, "Home", "IconHome"),
-            new(NavDestination.All, "All Screenshots", "IconImages"),
+            new(NavDestination.Library, "Library", "IconImages"),
             new(NavDestination.Favorites, "Favorites", "IconStar"),
             new(NavDestination.Tags, "Tags", "IconTag"),
             new(NavDestination.Settings, "Settings", "IconSettings"),
@@ -69,23 +70,26 @@ public sealed partial class MainViewModel : ObservableObject
 
         _hub.OpenEditor = id => Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = OpenEditorAsync(id));
         _hub.OpenTag = (id, name) => Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = OpenTagAsync(id));
-        _currentPage = _home;
+        _currentPage = _all;
     }
 
     public NotificationService Notifications { get; }
     public UpdateBannerViewModel Updates { get; }
     public DialogService Dialogs { get; }
     public ObservableCollection<NavItemViewModel> NavItems { get; }
+    /// <summary>The pages listed at the top of the sidebar; Settings sits at the bottom next to the version.</summary>
+    public IEnumerable<NavItemViewModel> MainNavItems => NavItems.Where(n => n.Destination != NavDestination.Settings);
+    public NavItemViewModel SettingsNavItem => NavItems.First(n => n.Destination == NavDestination.Settings);
 
     [ObservableProperty] private ViewModelBase _currentPage;
     [ObservableProperty] private bool _isSidebarCollapsed;
     [ObservableProperty] private bool _isCompact;
-    [ObservableProperty] private NavDestination _destination = NavDestination.Home;
+    [ObservableProperty] private NavDestination _destination = NavDestination.Library;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowShell))] private bool _isEditorOpen;
 
     public bool ShowShell => !IsEditorOpen;
 
-    public async Task InitializeAsync() => await NavigateAsync(NavDestination.Home).ConfigureAwait(true);
+    public async Task InitializeAsync() => await NavigateAsync(NavDestination.Library).ConfigureAwait(true);
 
     private void Navigate(NavDestination d) => _ = NavigateAsync(d);
 
@@ -102,8 +106,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private ViewModelBase PageFor(NavDestination d) => d switch
     {
-        NavDestination.Home => _home,
-        NavDestination.All => _all,
+        NavDestination.Library => _all,
         NavDestination.Favorites => _favorites,
         NavDestination.Tags => _tags,
         _ => _settings,
@@ -123,7 +126,6 @@ public sealed partial class MainViewModel : ObservableObject
     {
         switch (page)
         {
-            case HomeViewModel h: h.IsActive = active; break;
             case GalleryViewModel g: g.IsActive = active; break;
             case TagsViewModel t: t.IsActive = active; t.Gallery.IsActive = active; break;
         }
@@ -138,7 +140,7 @@ public sealed partial class MainViewModel : ObservableObject
     public async Task OpenEditorAsync(long screenshotId)
     {
         if (_editor is not null) await CloseEditorAsync(restore: false).ConfigureAwait(true);
-        _previousBeforeEditor = CurrentPage is EditorViewModel ? _home : CurrentPage;
+        _previousBeforeEditor = CurrentPage is EditorViewModel ? _all : CurrentPage;
 
         var editor = _services.GetRequiredService<EditorViewModel>();
         editor.Back = () => _ = CloseEditorAsync(restore: true);
@@ -157,7 +159,7 @@ public sealed partial class MainViewModel : ObservableObject
         await editor.OnNavigatedFromAsync().ConfigureAwait(true);
         IsEditorOpen = false;
 
-        var target = restore ? _previousBeforeEditor ?? _home : null;
+        var target = restore ? _previousBeforeEditor ?? _all : null;
         if (target is not null)
         {
             CurrentPage = target;
@@ -178,6 +180,20 @@ public sealed partial class MainViewModel : ObservableObject
         await NavigateAsync(NavDestination.Settings);
         _settings.RequestScroll(section);
     }
+    /// <summary>The assigned region shortcut for the sidebar button hint (empty when none is assigned or registered).</summary>
+    public string RegionShortcut => _home.RegionShortcut;
+    public bool CaptureSupported => _home.CaptureSupported;
+
+    /// <summary>Ctrl+K: opens the Library when another page is showing, then moves the focus to the search box. Not while editing.</summary>
+    public async Task FocusSearchAsync()
+    {
+        if (IsEditorOpen || Dialogs.Current is not null) return;
+        if (CurrentPage is not (GalleryViewModel or TagsViewModel)) await NavigateAsync(NavDestination.Library).ConfigureAwait(true);
+        var gallery = CurrentPage switch { GalleryViewModel g => g, TagsViewModel t => t.Gallery, _ => null };
+        // The page's view is created after the navigation; ask for the focus once it exists.
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => gallery?.RequestFocusSearch(), Avalonia.Threading.DispatcherPriority.Background);
+    }
+
     [RelayCommand] private Task CaptureRegionAsync() => _capture.CaptureRegionAsync();
     [RelayCommand] private Task CaptureFullScreenAsync() => _capture.CaptureFullScreenAsync();
 

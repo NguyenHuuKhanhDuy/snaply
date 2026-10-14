@@ -22,6 +22,12 @@ public sealed partial class ScreenshotItemViewModel : ObservableObject, IDisposa
 
     public ScreenshotItemViewModel(Screenshot model) => Model = model;
 
+    /// <summary>The window the screenshot came from, or the file name when that is not known.</summary>
+    public string Title => string.IsNullOrWhiteSpace(Model.SourceTitle) ? Model.FileName : Model.SourceTitle;
+    public bool HasSourceTitle => !string.IsNullOrWhiteSpace(Model.SourceTitle);
+    /// <summary>Compact meta line of a card: time and dimensions (size is shown separately on hover).</summary>
+    public string MetaText => $"{Model.CreatedAt.ToLocalTime():HH:mm} · {Model.Width}×{Model.Height}";
+
     public Screenshot Model { get; }
     public string FileName => Model.FileName;
     public string Subtitle => $"{Model.Width}×{Model.Height} · {FormatSize(Model.FileSize)}";
@@ -109,6 +115,7 @@ public sealed partial class GalleryViewModel : ViewModelBase
     private readonly IApplicationSettingsService _settings;
     private readonly ScreenshotActions _actions;
     private readonly DialogService _dialogs;
+    private readonly NavigationHub _hub;
     private readonly ILogger<GalleryViewModel> _log;
     private readonly CancellationTokenSource _lifetime = new();
     private PageCursor? _cursor;
@@ -118,9 +125,9 @@ public sealed partial class GalleryViewModel : ViewModelBase
     private Func<DateTime> _today = () => DateTime.Today;
 
     public GalleryViewModel(IScreenshotRepository repo, IScreenshotLibrary library, LibraryEvents events, DetailsViewModel details,
-        IApplicationSettingsService settings, ScreenshotActions actions, DialogService dialogs, ILogger<GalleryViewModel> log)
+        IApplicationSettingsService settings, ScreenshotActions actions, DialogService dialogs, NavigationHub hub, ILogger<GalleryViewModel> log)
     {
-        _repo = repo; _library = library; _events = events; _settings = settings; _actions = actions; _dialogs = dialogs; _log = log;
+        _repo = repo; _library = library; _events = events; _settings = settings; _actions = actions; _dialogs = dialogs; _hub = hub; _log = log;
         Details = details;
         Details.Deleted += OnDeleted;
         _events.Changed += OnLibraryChanged;
@@ -183,7 +190,11 @@ public sealed partial class GalleryViewModel : ViewModelBase
         OnPropertyChanged(nameof(EmptyHint));
     }
 
-    public override Task OnNavigatedToAsync() => ReloadAsync();
+    public override async Task OnNavigatedToAsync()
+    {
+        if (Header is not null) await Header.OnNavigatedToAsync().ConfigureAwait(true);
+        await ReloadAsync().ConfigureAwait(true);
+    }
 
     private void OnLibraryChanged()
     {
@@ -191,7 +202,21 @@ public sealed partial class GalleryViewModel : ViewModelBase
         _ = ReloadAsync(keepSelection: true);
     }
 
-    public bool IsActive { get; set; }
+    private bool _isActive;
+
+    public bool IsActive
+    {
+        get => _isActive;
+        set { _isActive = value; if (Header is not null) Header.IsActive = value; }
+    }
+
+    /// <summary>Set on the Library only: the capture actions, shortcut hints and getting-started card shown above the grid.</summary>
+    public HomeViewModel? Header { get; set; }
+    public bool IsLibrary => Header is not null;
+
+    /// <summary>Raised when the search box should take the keyboard focus (Ctrl+K).</summary>
+    public event Action? FocusSearchRequested;
+    public void RequestFocusSearch() => FocusSearchRequested?.Invoke();
 
     partial void OnSearchTextChanged(string value) { OnPropertyChanged(nameof(HasFilters)); _ = DebouncedReloadAsync(); }
     partial void OnSelectedFormatChanged(FilterOption value) { OnPropertyChanged(nameof(HasFilters)); _ = ReloadAsync(); }
@@ -452,6 +477,26 @@ public sealed partial class GalleryViewModel : ViewModelBase
         if (FocusedItem is not { } f) return;
         TileClick(new TileClick(f, KeyModifiers.None));
     }
+
+    // ---- single-card actions (hover buttons and the More menu) ----
+
+    public bool CanReveal => _actions.CanReveal;
+
+    [RelayCommand] private Task CopyItemAsync(ScreenshotItemViewModel? item) => item is null ? Task.CompletedTask : _actions.CopyImageAsync(item.Model);
+
+    [RelayCommand]
+    private async Task ToggleFavoriteItemAsync(ScreenshotItemViewModel? item)
+    {
+        if (item is null) return;
+        var value = !item.IsFavorite;
+        await _actions.SetFavoriteAsync(item.Model, value).ConfigureAwait(true);
+        item.IsFavorite = value;
+    }
+
+    [RelayCommand] private void OpenItemInEditor(ScreenshotItemViewModel? item) { if (item is not null) _hub.OpenEditor?.Invoke(item.Model.Id); }
+    [RelayCommand] private void RevealItem(ScreenshotItemViewModel? item) { if (item is not null) _actions.Reveal(item.Model); }
+    [RelayCommand] private Task ExportItemAsync(ScreenshotItemViewModel? item) => item is null ? Task.CompletedTask : _actions.ExportAsync(item.Model);
+    [RelayCommand] private Task DeleteItemAsync(ScreenshotItemViewModel? item) => item is null ? Task.CompletedTask : _actions.DeleteAsync(item.Model); // confirms; the library change event reloads the page
 
     // ---- bulk actions ----
 

@@ -20,6 +20,7 @@ public sealed class CaptureOrchestrator
     private readonly IAppWindowController _window;
     private readonly INotificationService _notifications;
     private readonly ILogger<CaptureOrchestrator> _log;
+    private readonly IActiveWindowService? _activeWindow;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     public const int MinRegionSize = 4;
@@ -27,8 +28,9 @@ public sealed class CaptureOrchestrator
     public CaptureOrchestrator(
         IScreenCaptureService capture, IClipboardService clipboard, IScreenshotLibrary library,
         IApplicationSettingsService settings, IRegionSelector selector, IAppWindowController window,
-        INotificationService notifications, ILogger<CaptureOrchestrator> log)
+        INotificationService notifications, ILogger<CaptureOrchestrator> log, IActiveWindowService? activeWindow = null)
     {
+        _activeWindow = activeWindow;
         _capture = capture; _clipboard = clipboard; _library = library; _settings = settings;
         _selector = selector; _window = window; _notifications = notifications; _log = log;
     }
@@ -106,6 +108,9 @@ public sealed class CaptureOrchestrator
         var virtualBounds = PixelRect.Union(monitors.Select(m => m.Bounds));
         var delay = delayOverride ?? settings.CaptureDelaySeconds;
 
+        // Read before our own window is hidden or any overlay appears, while the user's window is still the foreground one.
+        var sourceTitle = settings.RememberSourceWindow ? ReadSourceTitle() : null;
+
         var hidden = await _window.HideAsync().ConfigureAwait(false);
         try
         {
@@ -155,7 +160,7 @@ public sealed class CaptureOrchestrator
             }
 
             Last = new LastCapture(mode, mode == CaptureMode.Region ? area : null);
-            return await FinishAsync(image, mode, settings, action, ct).ConfigureAwait(false);
+            return await FinishAsync(image, mode, settings, action, sourceTitle, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -190,7 +195,13 @@ public sealed class CaptureOrchestrator
         return (hit ?? monitors.FirstOrDefault(m => m.IsPrimary) ?? monitors[0]).Bounds;
     }
 
-    private async Task<Result<CaptureOutcome>> FinishAsync(RawImage image, CaptureMode mode, AppSettings settings, SelectionAction action, CancellationToken ct)
+    private string? ReadSourceTitle()
+    {
+        try { return _activeWindow?.GetForegroundWindowTitle(); }
+        catch (Exception ex) { _log.LogDebug(ex, "Could not read the foreground window"); return null; } // never log the title itself
+    }
+
+    private async Task<Result<CaptureOutcome>> FinishAsync(RawImage image, CaptureMode mode, AppSettings settings, SelectionAction action, string? sourceTitle, CancellationToken ct)
     {
         var wantSave = action switch { SelectionAction.Save => true, SelectionAction.Copy => false, _ => settings.SaveToLibraryAfterCapture };
         var wantCopy = action switch { SelectionAction.Save => false, SelectionAction.Copy => true, _ => settings.CopyToClipboardAfterCapture };
@@ -202,7 +213,7 @@ public sealed class CaptureOrchestrator
 
         if (save)
         {
-            var add = await _library.AddAsync(image, mode == CaptureMode.Region ? CaptureMethod.Region : CaptureMethod.FullScreen, ct).ConfigureAwait(false);
+            var add = await _library.AddAsync(image, mode == CaptureMode.Region ? CaptureMethod.Region : CaptureMethod.FullScreen, sourceTitle, ct).ConfigureAwait(false);
             if (!add.IsSuccess) return Result<CaptureOutcome>.Fail(add.Error!);
             saved = add.Value;
         }

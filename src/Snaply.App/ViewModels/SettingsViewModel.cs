@@ -56,6 +56,28 @@ public sealed partial class OcrLanguageRow : ObservableObject
 }
 
 /// <summary>One kind of sensitive data the redaction scan can look for; turning it off removes it from suggestions.</summary>
+/// <summary>One colour theme in the Appearance picker: its name and its accent in Light and Dark.</summary>
+public sealed partial class ColorThemeOption : ObservableObject
+{
+    public ColorThemeOption(Snaply.App.Themes.ColorPalette palette)
+    {
+        Id = palette.Id; Name = palette.Name;
+        LightBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(palette.PreviewAccent(false)));
+        DarkBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(palette.PreviewAccent(true)));
+        Refresh(Avalonia.Application.Current?.ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark);
+    }
+
+    public string Id { get; }
+    public string Name { get; }
+    public Avalonia.Media.IBrush LightBrush { get; }
+    public Avalonia.Media.IBrush DarkBrush { get; }
+    /// <summary>The theme's accent for the mode currently shown (the picker's round swatch).</summary>
+    [ObservableProperty] private Avalonia.Media.IBrush _brush = null!;
+    [ObservableProperty] private bool _isSelected;
+
+    public void Refresh(bool dark) => Brush = dark ? DarkBrush : LightBrush;
+}
+
 public sealed partial class RedactionRuleRow : ObservableObject
 {
     private readonly SettingsViewModel _owner;
@@ -108,6 +130,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         _settings = settings; _theme = theme; _dialogs = dialogs; _notes = notes; _hotkeys = hotkeys; _library = library; _repo = repo;
         _ocr = ocr; _capture = capture; _shell = shell; _paths = paths; _events = events;
         Updates = updates;
+        if (Avalonia.Application.Current is { } app) app.ActualThemeVariantChanged += (_, _) => RefreshSwatches();
         BuildSections();
 
         Shortcuts = new ObservableCollection<ShortcutRowViewModel>
@@ -126,10 +149,11 @@ public sealed partial class SettingsViewModel : ViewModelBase
     public string? PendingScroll { get; set; }
 
     public ObservableCollection<SettingsSectionItem> Sections { get; } = new();
-    [ObservableProperty] private string _activeSection = "appearance";
+    [ObservableProperty] private string _activeSection = "general";
 
     private void BuildSections()
     {
+        Sections.Add(new("general", "General", "IconInfo"));
         Sections.Add(new("appearance", "Appearance", "IconSun"));
         Sections.Add(new("capture", "Capture", "IconCapture"));
         Sections.Add(new("shortcuts", "Shortcuts", "IconKeyboard"));
@@ -138,7 +162,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
         Sections.Add(new("storage", "Storage", "IconFolder"));
         Sections.Add(new("updates", "Updates", "IconRefresh"));
         Sections.Add(new("about", "About", "IconInfo"));
-        SetActiveSection("appearance");
+        SetActiveSection("general");
     }
 
     /// <summary>Highlights a section in the list (called when the user scrolls or picks one).</summary>
@@ -171,6 +195,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _autoCheckUpdates;
     [ObservableProperty] private bool _runInBackground;
     [ObservableProperty] private bool _startWithWindows;
+    [ObservableProperty] private bool _rememberSourceWindow;
 
     // Capture
     [ObservableProperty] private string _saveDirectory = "";
@@ -195,6 +220,28 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string _tessdataPath = "";
 
     public ObservableCollection<RedactionRuleRow> RedactionRules { get; } = new();
+
+    // ---- colour themes ----
+    public ObservableCollection<ColorThemeOption> ColorThemes { get; } = new(Snaply.App.Themes.ColorPalettes.All.Select(p => new ColorThemeOption(p)));
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(SelectedColorThemeName))] private ColorThemeOption _selectedColorTheme = null!;
+    public string SelectedColorThemeName => SelectedColorTheme?.Name ?? "";
+
+    /// <summary>Re-colours the round swatches when the app switches between Light and Dark.</summary>
+    private void RefreshSwatches()
+    {
+        var dark = Avalonia.Application.Current?.ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark;
+        foreach (var t in ColorThemes) t.Refresh(dark);
+    }
+
+    partial void OnSelectedColorThemeChanged(ColorThemeOption value)
+    {
+        foreach (var t in ColorThemes) t.IsSelected = ReferenceEquals(t, value);
+        if (_loading || value is null) return;
+        _theme.ApplyPalette(value.Id);                                  // live preview: no restart, no extra step
+        _ = ApplyAsync(s => s.ColorTheme = value.Id);
+    }
+
+    [RelayCommand] private void PickColorTheme(ColorThemeOption? option) { if (option is not null) SelectedColorTheme = option; }
 
     internal void OnRedactionRuleToggled()
     {
@@ -242,7 +289,9 @@ public sealed partial class SettingsViewModel : ViewModelBase
             ReduceMotion = s.ReduceMotion;
             AutoCheckUpdates = s.AutoCheckUpdates;
             RunInBackground = s.RunInBackground;
+            SelectedColorTheme = ColorThemes.FirstOrDefault(t => string.Equals(t.Id, s.ColorTheme, StringComparison.OrdinalIgnoreCase)) ?? ColorThemes[0];
             StartWithWindows = s.StartWithWindows;
+            RememberSourceWindow = s.RememberSourceWindow;
             SaveDirectory = _settings.EffectiveSaveDirectory;
             UsesDefaultDirectory = string.IsNullOrWhiteSpace(s.SaveDirectory);
             FormatIndex = s.DefaultFormat == ImageFormat.Jpeg ? 1 : 0;
@@ -300,6 +349,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
         await ApplyAsync(s => s.Theme = mode).ConfigureAwait(true);
         _theme.Apply(_settings.Current.Theme);
     }
+
+    partial void OnRememberSourceWindowChanged(bool value) => _ = ApplyAsync(s => s.RememberSourceWindow = value);
 
     partial void OnRunInBackgroundChanged(bool value) => _ = ApplyAsync(s => s.RunInBackground = value);
 

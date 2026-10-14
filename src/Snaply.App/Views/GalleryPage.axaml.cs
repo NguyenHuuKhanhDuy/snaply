@@ -14,6 +14,13 @@ public partial class GalleryPage : UserControl
 
     private GalleryViewModel? _vm;
 
+    private void FocusSearch()
+    {
+        if (this.FindControl<TextBox>("SearchBox") is not { } box) return;
+        box.Focus();
+        box.SelectAll();
+    }
+
     public GalleryPage()
     {
         InitializeComponent();
@@ -41,9 +48,9 @@ public partial class GalleryPage : UserControl
 
         DataContextChanged += (_, _) =>
         {
-            if (_vm is not null) _vm.FocusMoved -= ScrollIntoView;
+            if (_vm is not null) { _vm.FocusMoved -= ScrollIntoView; _vm.FocusSearchRequested -= FocusSearch; }
             _vm = DataContext as GalleryViewModel;
-            if (_vm is not null) _vm.FocusMoved += ScrollIntoView;
+            if (_vm is not null) { _vm.FocusMoved += ScrollIntoView; _vm.FocusSearchRequested += FocusSearch; }
         };
         KeyDown += OnKeyDown;
     }

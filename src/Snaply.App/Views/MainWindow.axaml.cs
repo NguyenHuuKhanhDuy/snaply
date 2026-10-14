@@ -44,6 +44,13 @@ public partial class MainWindow : Window
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
+        if (e.Key == Key.K && e.KeyModifiers.HasFlag(KeyModifiers.Control) && DataContext is MainViewModel main)
+        {
+            e.Handled = true;
+            _ = main.FocusSearchAsync();
+            return;
+        }
+
         // Escape closes an open dialog (as Cancel).
         if (e.Key == Key.Escape && DataContext is MainViewModel { Dialogs.Current: not null } vm)
         {

@@ -2,10 +2,14 @@ namespace Snaply.Core.Models;
 
 public class Screenshot
 {
+    public const int MaxSourceTitleLength = 200;
+
     public long Id { get; set; }
     public string FilePath { get; set; } = "";
     public string? ThumbnailPath { get; set; }
     public string FileName { get; set; } = "";
+    /// <summary>Title of the window that was captured (Windows only, optional, local only). Null when unknown or switched off.</summary>
+    public string? SourceTitle { get; set; }
     public DateTime CreatedAt { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }

@@ -49,8 +49,28 @@ public sealed class InlineEditSession : IDisposable
     public int Width => (int)Math.Round(_doc.OutputArea.Width);
     public int Height => (int)Math.Round(_doc.OutputArea.Height);
     public DocPoint Origin => new(_doc.OutputArea.X, _doc.OutputArea.Y);
-    public InlineTool Tool { get; set; } = InlineTool.None;
+    private InlineTool _tool = InlineTool.None;
+
+    public InlineTool Tool
+    {
+        get => _tool;
+        set
+        {
+            if (_tool == value) return;
+            var was = _tool;
+            _tool = value;
+            // Until the user picks a colour, the Highlight tool shows (and uses) yellow, and the default red returns when leaving it,
+            // so the active swatch always matches what is drawn.
+            if (!ColorChosen)
+            {
+                if (value == InlineTool.Highlight) Color = Colors.Yellow;
+                else if (was == InlineTool.Highlight && Color == Colors.Yellow) Color = Colors.Red;
+            }
+        }
+    }
     public uint Color { get; set; } = Colors.Red;
+    /// <summary>True once the user picked a colour; until then the Highlight tool switches the colour to yellow by itself.</summary>
+    public bool ColorChosen { get; set; }
     public float Stroke { get; set; } = 4;
     /// <summary>Style toggles from the options bar: stroke pattern, bold text, and the text backing (none / soft / solid / outline).</summary>
     public StrokePattern Pattern { get; set; }
@@ -87,7 +107,7 @@ public sealed class InlineEditSession : IDisposable
             InlineTool.Line => new ArrowAnnotation { Start = a, End = b, Color = Color, StrokeWidth = Math.Max(Stroke, 2), Head = ArrowHead.None, Pattern = Pattern },
             InlineTool.Pen => CreatePen(a, b),
             InlineTool.Spotlight => new SpotlightAnnotation { Rect = rect, Dim = SpotlightDim },
-            InlineTool.Highlight => new HighlightAnnotation { Rect = rect, Color = Color == Colors.Red ? Colors.Yellow : Color },
+            InlineTool.Highlight => new HighlightAnnotation { Rect = rect, Color = Color },
             InlineTool.Blur => new BlurAnnotation { Rect = rect, Radius = Math.Max(8, Math.Min(rect.Width, rect.Height) / 6) },
             InlineTool.Pixelate => new PixelateAnnotation { Rect = rect, BlockSize = (int)Math.Max(8, Math.Min(rect.Width, rect.Height) / 8) },
             _ => null,

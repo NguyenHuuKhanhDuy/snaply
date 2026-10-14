@@ -41,6 +41,7 @@ public static class PlatformServices
             services.AddSingleton<IGlobalHotkeyService, WindowsHotkeyService>();
             services.AddSingleton<IShellService, WindowsShellService>();
             services.AddSingleton<IStartupRegistration, WindowsStartupRegistration>();
+            services.AddSingleton<IActiveWindowService, WindowsActiveWindowService>();
         }
         else if (OperatingSystem.IsMacOS())
         {
@@ -50,6 +51,7 @@ public static class PlatformServices
                 "Global shortcuts are not implemented on macOS yet. Bind a system keyboard shortcut to run 'snaply --capture-region' instead."));
             services.AddSingleton<IShellService, MacShellService>();
             services.AddSingleton<IStartupRegistration, UnsupportedStartupRegistration>();
+            services.AddSingleton<IActiveWindowService, NullActiveWindowService>();
         }
         else
         {
@@ -60,6 +62,7 @@ public static class PlatformServices
                 : "Global shortcuts are not implemented for X11 yet. Bind a keyboard shortcut in your desktop settings to run 'snaply --capture-region'."));
             services.AddSingleton<IShellService, LinuxShellService>();
             services.AddSingleton<IStartupRegistration, UnsupportedStartupRegistration>();
+            services.AddSingleton<IActiveWindowService, NullActiveWindowService>();
         }
         return services;
     }

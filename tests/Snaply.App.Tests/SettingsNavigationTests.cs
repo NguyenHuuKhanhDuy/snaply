@@ -41,7 +41,7 @@ public class SettingsNavigationTests
     public async Task Section_list_scrolls_to_the_chosen_section_and_highlights_it()
     {
         using var h = await OpenAsync();
-        Assert.Equal(8, h.Vm.Sections.Count);
+        Assert.Equal(9, h.Vm.Sections.Count);
 
         h.Vm.GoToSectionCommand.Execute("storage");
         await Settle();
@@ -134,6 +134,6 @@ public class SettingsNavigationTests
         Assert.False(h.Page.FindControl<Border>("SectionNav")!.IsVisible);
         var picker = h.Page.FindControl<ComboBox>("SectionPicker")!;
         Assert.True(picker.IsVisible);
-        Assert.Equal(8, ((IEnumerable<object>)picker.ItemsSource!).Count());
+        Assert.Equal(9, ((IEnumerable<object>)picker.ItemsSource!).Count());
     }
 }

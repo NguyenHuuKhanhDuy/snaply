@@ -1,5 +1,6 @@
 using NSubstitute;
 using Avalonia;
+using Avalonia.VisualTree;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Styling;
@@ -37,12 +38,12 @@ public class UiShots
         Dispatcher.UIThread.RunJobs();
     }
 
-    private sealed record Page(string Name, int? Height, Func<UiFixture, MainViewModel, Task> Setup);
+    private sealed record Page(string Name, int? Height, Func<UiFixture, MainViewModel, Task> Setup, bool HoverFirstCard = false);
 
     private static IEnumerable<Page> Pages(bool populated)
     {
-        yield return new("home", null, (fx, m) => m.NavigateAsync(NavDestination.Home));
-        yield return new("gallery", null, (fx, m) => m.NavigateAsync(NavDestination.All));
+        yield return new("library", null, (fx, m) => m.NavigateAsync(NavDestination.Library));
+        yield return new("library-hover", null, (fx, m) => m.NavigateAsync(NavDestination.Library), HoverFirstCard: true);
         if (populated)
         {
             yield return new("gallery-details", null, async (fx, m) =>
@@ -140,6 +141,16 @@ public class UiShots
         });
     }
 
+    /// <summary>Moves the pointer over the first card so its hover border and quick actions are drawn.</summary>
+    private static async Task HoverFirstCardAsync(MainWindow window)
+    {
+        var tile = window.GetVisualDescendants().OfType<Snaply.App.Controls.ScreenshotTile>().FirstOrDefault();
+        if (tile is null) return;
+        var p = tile.TranslatePoint(new Point(tile.Bounds.Width / 2, 60), window);
+        if (p is { } point) window.MouseMove(point);
+        await Settle(400);
+    }
+
     private static async Task RenderAllAsync(string state, bool populated, bool updateAvailable)
     {
         // SNAPLY_UI_PAGES=settings,home limits the run to the named pages (handy while iterating on one screen).
@@ -158,7 +169,8 @@ public class UiShots
             window.Show();
             await main.InitializeAsync();
             await page.Setup(shot, main);
-            await Settle(page.Name is "gallery" or "gallery-details" or "editor" ? 1500 : 700);
+            await Settle(page.Name is "library" or "library-hover" or "gallery-details" or "editor" ? 1500 : 700);
+            if (page.HoverFirstCard) await HoverFirstCardAsync(window);
 
             var dir = Path.Combine(OutputRoot, state, themeName, sizeName);
             Directory.CreateDirectory(dir);
@@ -180,4 +192,38 @@ public class UiShots
     [Trait("Category", "Screenshots")]
     [AvaloniaFact(Timeout = 900_000)]
     public Task Render_populated_library_with_update_available() => RenderAllAsync("populated", populated: true, updateAvailable: true);
+
+    /// <summary>Library and the Appearance settings in every colour theme and both modes, for a visual check of each palette.</summary>
+    [Trait("Category", "Screenshots")]
+    [AvaloniaFact(Timeout = 900_000)]
+    public async Task Render_every_colour_theme()
+    {
+        var themeService = new Snaply.App.Services.ThemeService();
+        try
+        {
+            foreach (var palette in Snaply.App.Themes.ColorPalettes.All)
+            foreach (var (themeName, theme) in Themes)
+            foreach (var (pageName, nav, height) in new[] { ("library", NavDestination.Library, 700), ("settings", NavDestination.Settings, 900) })
+            {
+                themeService.ApplyPalette(palette.Id);
+                Application.Current!.RequestedThemeVariant = theme;
+                using var shot = await UiFixture.CreateAsync(populated: true, updateAvailable: false);
+                var main = shot.Services.GetRequiredService<MainViewModel>();
+                var window = new MainWindow { DataContext = main, Width = 1100, Height = height };
+                window.RequestedThemeVariant = theme;
+                window.Show();
+                await main.InitializeAsync();
+                await main.NavigateAsync(nav);
+                await Settle(pageName == "library" ? 1500 : 700);
+
+                var dir = Path.Combine(OutputRoot, "themes", palette.Id, themeName);
+                Directory.CreateDirectory(dir);
+                var file = Path.Combine(dir, pageName + ".png");
+                using (var frame = window.CaptureRenderedFrame()) { Assert.NotNull(frame); frame!.Save(file); }
+                Assert.True(new FileInfo(file).Length > 4000, $"{file} looks blank");
+                window.Close();
+            }
+        }
+        finally { themeService.ApplyPalette("default"); }
+    }
 }

@@ -52,6 +52,10 @@ Tesseract runs locally. Snaply never downloads language data automatically. Put 
 
 In the editor, **Find sensitive info** reads the image with the local OCR engine, looks for things like emails, phone numbers, IP addresses, keys, tokens and JWTs, and highlights them. You decide what to cover; nothing is covered automatically. Covered areas become solid boxes and **Save redacted copy** writes a new, flattened image with no stored text or editable layers. The original is kept unless you choose to delete it. Detection is a help, not a guarantee: OCR can miss text, so always look over the result. Details and limits: [docs/redaction.md](docs/redaction.md).
 
+## Library and colour themes
+
+Home and All Screenshots are one **Library** page: a capture bar with your real shortcuts (Capture region in the sidebar; Full screen, Delay 5s and Repeat last region on the page), search by window, tag or text (`Ctrl+K` from anywhere), and compact cards with quick Copy, Favorite and More buttons on hover. On Windows each capture remembers the title of the window it came from (a Settings switch turns this off; it stays on the device and is never copied to a redacted copy). Settings → Appearance has seven colour themes (Default blue, Graphite, Ocean, Forest, Amber, Violet, Rose) that work in Light and Dark and apply instantly; every theme is checked for contrast in both modes. Renders: `docs/library-light.png`, `docs/library-hover-dark.png`.
+
 ## Platform notes
 
 - **macOS:** grant Screen Recording permission (System Settings → Privacy & Security). Snaply reports `PermissionDenied` instead of returning a blank image.
