@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Platform;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Microsoft.Extensions.Configuration;
@@ -55,6 +56,7 @@ public partial class App : Application
             var main = _services.GetRequiredService<MainViewModel>();
             var window = new MainWindow { DataContext = main };
             desktop.MainWindow = window;
+            SetupBackgroundMode(desktop, window);
             window.Opened += async (_, _) => await OnWindowOpenedAsync(main);
             desktop.ShutdownRequested += (_, _) => Shutdown();
             desktop.Exit += (_, _) => (_services as IDisposable)?.Dispose();
@@ -63,6 +65,68 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private bool _quitting;
+    private bool _trayAvailable;
+    private bool _toldAboutTray;
+    private TrayIcon? _tray;
+
+    /// <summary>
+    /// Closing the window hides it to the system tray (when enabled) so global shortcuts keep working. The tray menu's Quit really exits.
+    /// </summary>
+    private void SetupBackgroundMode(IClassicDesktopStyleApplicationLifetime desktop, Window window)
+    {
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        var settings = _services!.GetRequiredService<IApplicationSettingsService>();
+        var notes = _services!.GetRequiredService<INotificationService>();
+
+        try
+        {
+            using var icon = AssetLoader.Open(new Uri("avares://Snaply/Assets/snaply-32.png"));
+            var menu = new NativeMenu();
+            var open = new NativeMenuItem("Open Snaply");
+            open.Click += (_, _) => Dispatcher.UIThread.Post(AppWindowController.ShowMainWindow);
+            var region = new NativeMenuItem("Capture region");
+            region.Click += (_, _) => Dispatcher.UIThread.Post(() => _ = RunCommandAsync(StartupCommand.CaptureRegion));
+            var full = new NativeMenuItem("Capture full screen");
+            full.Click += (_, _) => Dispatcher.UIThread.Post(() => _ = RunCommandAsync(StartupCommand.CaptureFullScreen));
+            var quit = new NativeMenuItem("Quit Snaply");
+            quit.Click += (_, _) => Dispatcher.UIThread.Post(() => Quit(desktop));
+            menu.Add(open); menu.Add(new NativeMenuItemSeparator()); menu.Add(region); menu.Add(full); menu.Add(new NativeMenuItemSeparator()); menu.Add(quit);
+
+            _tray = new TrayIcon { Icon = new WindowIcon(icon), ToolTipText = "Snaply", Menu = menu, IsVisible = true };
+            _tray.Clicked += (_, _) => Dispatcher.UIThread.Post(AppWindowController.ShowMainWindow);
+            TrayIcon.SetIcons(this, new TrayIcons { _tray });
+            _trayAvailable = true;
+        }
+        catch (Exception ex)
+        {
+            // No tray on this desktop: fall back to the normal behaviour of quitting when the window closes.
+            _log?.LogWarning(ex, "System tray is not available");
+            _trayAvailable = false;
+        }
+
+        window.Closing += (_, e) =>
+        {
+            if (_quitting || !_trayAvailable || !settings.Current.RunInBackground || e.CloseReason is WindowCloseReason.OSShutdown or WindowCloseReason.ApplicationShutdown) return;
+            e.Cancel = true;
+            window.Hide();
+            if (!_toldAboutTray)
+            {
+                _toldAboutTray = true;
+                notes.Show(NotificationKind.Info, "Snaply is still running", "It stays in the system tray so your shortcuts keep working. Right-click the tray icon and choose Quit to exit.");
+            }
+        };
+        window.Closed += (_, _) => { if (!_quitting) Quit(desktop); };
+    }
+
+    private void Quit(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        if (_quitting) return;
+        _quitting = true;
+        _tray?.Dispose();
+        desktop.Shutdown();
     }
 
     private static ServiceProvider BuildServices()
@@ -150,11 +214,14 @@ public partial class App : Application
         coordinator.IsCaptureActive = () => capture.IsBusy;
         main.Updates.Refresh();
 
-        // Background check a few seconds after startup; failures are silent and the setting/cooldown are handled by the coordinator.
+        // Check a few seconds after startup, then re-check periodically so an app left running in the tray still learns about new
+        // versions. The coordinator applies the setting and the 1-hour cooldown, and failures stay silent.
         _ = Task.Run(async () =>
         {
             await Task.Delay(TimeSpan.FromSeconds(10));
             await coordinator.CheckAsync(manual: false);
+            using var timer = new PeriodicTimer(TimeSpan.FromMinutes(30));
+            while (await timer.WaitForNextTickAsync()) await coordinator.CheckAsync(manual: false);
         });
     }
 

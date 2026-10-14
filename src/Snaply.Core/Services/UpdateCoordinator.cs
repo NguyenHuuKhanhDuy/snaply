@@ -28,7 +28,7 @@ public enum UpdateState { Idle, Checking, UpToDate, Available, Downloading, Read
 /// </summary>
 public sealed class UpdateCoordinator
 {
-    public static readonly TimeSpan AutoCheckInterval = TimeSpan.FromHours(6);
+    public static readonly TimeSpan AutoCheckInterval = TimeSpan.FromHours(1);
 
     private readonly IAppUpdateService _service;
     private readonly IApplicationSettingsService _settings;
@@ -72,9 +72,10 @@ public sealed class UpdateCoordinator
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>Automatic checks respect the setting and a 6-hour cooldown; manual checks always run and always report.</summary>
+    /// <summary>Automatic checks respect the setting and a 1-hour cooldown; manual checks always run and always report.</summary>
     public async Task CheckAsync(bool manual, CancellationToken ct = default)
     {
+        _log.LogInformation("Update check requested (manual: {Manual}, supported: {Supported}, current: {Current})", manual, _service.IsSupported, _service.CurrentVersion);
         if (!_service.IsSupported)
         {
             if (manual) Set(UpdateState.Idle, _service.UnsupportedReason ?? "Updates are not available in this build.");
@@ -87,8 +88,8 @@ public sealed class UpdateCoordinator
             if (!manual)
             {
                 var s = _settings.Current;
-                if (!s.AutoCheckUpdates) return;
-                if (s.LastUpdateCheckUtc is { } last && _utcNow() - last < AutoCheckInterval) return;
+                if (!s.AutoCheckUpdates) { _log.LogInformation("Update check skipped: automatic checks are off"); return; }
+                if (s.LastUpdateCheckUtc is { } last && _utcNow() - last < AutoCheckInterval) { _log.LogInformation("Update check skipped: last check was {Last}", last); return; }
             }
             State = UpdateState.Checking; Message = null; Progress = 0;
         }
@@ -115,7 +116,8 @@ public sealed class UpdateCoordinator
         await _settings.UpdateAsync(s => s.LastUpdateCheckUtc = _utcNow(), ct).ConfigureAwait(false);
 
         var found = result.Value;
-        if (found is null) { Available = null; Set(UpdateState.UpToDate); return; }
+        if (found is null) { _log.LogInformation("Update check: up to date"); Available = null; Set(UpdateState.UpToDate); return; }
+        _log.LogInformation("Update check: version {Version} is available", found.Version);
         Available = found;
         Set(UpdateState.Available);
     }

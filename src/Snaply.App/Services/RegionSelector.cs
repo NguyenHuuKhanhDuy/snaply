@@ -28,22 +28,22 @@ public sealed class RegionSelector : IRegionSelector
         var tcs = new TaskCompletionSource<RegionSelection?>(TaskCreationOptions.RunContinuationsAsynchronously);
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            var windows = new List<RegionOverlayWindow>();
+            RegionOverlayWindow? window = null;
             void Finish(RegionSelection? result)
             {
                 if (tcs.Task.IsCompleted) return;
                 tcs.TrySetResult(result);
-                foreach (var w in windows) w.Close();
+                window?.Close();
             }
 
-            foreach (var m in monitors)
-            {
-                var framePx = CaptureOrchestrator.ToFramePixels(frozenFrame, virtualBounds, m.Bounds);
-                var monitorFrame = frozenFrame.Crop(framePx);
-                windows.Add(new RegionOverlayWindow(monitorFrame, m, options, Finish));
-            }
-            foreach (var w in windows) w.ShowOverlay();
-            (windows.FirstOrDefault(w => w.HasPreselection) ?? windows.FirstOrDefault(w => w.IsPrimary))?.Activate();
+            // One borderless window covers the whole virtual desktop, so a selection can be dragged across monitors.
+            // Its DPI scale comes from the monitor at the top-left corner; monitors with different scaling are an
+            // approximation (not verified).
+            var origin = monitors.OrderBy(m => m.Bounds.X).ThenBy(m => m.Bounds.Y).First();
+            var desktop = new MonitorInfo(0, virtualBounds, origin.Scale, true);
+            window = new RegionOverlayWindow(frozenFrame, desktop, options, Finish);
+            window.ShowOverlay();
+            window.Activate();
         });
 
         using var reg = ct.Register(() => Dispatcher.UIThread.Post(() => tcs.TrySetResult(null)));

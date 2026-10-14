@@ -17,6 +17,8 @@ public sealed class AppSettings
     public int CaptureDelaySeconds { get; set; }
     public bool ReduceMotion { get; set; }
     /// <summary>Check GitHub for a newer version shortly after startup (no data is sent).</summary>
+    /// <summary>Closing the window hides it to the system tray so global shortcuts keep working.</summary>
+    public bool RunInBackground { get; set; } = true;
     public bool AutoCheckUpdates { get; set; } = true;
     public DateTime? LastUpdateCheckUtc { get; set; }
     public List<string> OcrLanguages { get; set; } = new() { "eng" };
@@ -35,7 +37,7 @@ public sealed class AppSettings
         CopyToClipboardAfterCapture = CopyToClipboardAfterCapture, SaveToLibraryAfterCapture = SaveToLibraryAfterCapture, EditAfterSelection = EditAfterSelection,
         OpenEditorAfterCapture = OpenEditorAfterCapture, FullScreenTarget = FullScreenTarget,
         CaptureDelaySeconds = CaptureDelaySeconds, ReduceMotion = ReduceMotion,
-        AutoCheckUpdates = AutoCheckUpdates, LastUpdateCheckUtc = LastUpdateCheckUtc,
+        RunInBackground = RunInBackground, AutoCheckUpdates = AutoCheckUpdates, LastUpdateCheckUtc = LastUpdateCheckUtc,
         OcrLanguages = new List<string>(OcrLanguages), Hotkeys = new Dictionary<string, string>(Hotkeys),
     };
 }

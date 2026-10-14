@@ -12,7 +12,10 @@ public class GestureTests
     [Theory]
     [InlineData("Alt+Shift+S", HotkeyModifiers.Alt | HotkeyModifiers.Shift, "S")]
     [InlineData("ctrl+f5", HotkeyModifiers.Ctrl, "F5")]
-    [InlineData("Win+PrintScreen", HotkeyModifiers.Meta, "Printscreen")]
+    [InlineData("Win+PrintScreen", HotkeyModifiers.Meta, "PrintScreen")]
+    [InlineData("PrintScreen", HotkeyModifiers.None, "PrintScreen")]
+    [InlineData("F9", HotkeyModifiers.None, "F9")]
+    [InlineData("prtsc", HotkeyModifiers.None, "PrintScreen")]
     public void Parses_valid_gestures(string text, HotkeyModifiers mods, string key)
     {
         Assert.True(HotkeyGesture.TryParse(text, out var g, out var err), err);
@@ -23,6 +26,8 @@ public class GestureTests
     [Theory]
     [InlineData("")]
     [InlineData("S")]
+    [InlineData("Space")]
+    [InlineData("Enter")]
     [InlineData("Alt+")]
     [InlineData("Alt+S+D")]
     [InlineData("Alt+@@")]
@@ -547,17 +552,17 @@ public class UpdateCoordinatorTests
     }
 
     [Fact]
-    public async Task Automatic_check_respects_six_hour_cooldown_but_manual_does_not()
+    public async Task Automatic_check_respects_one_hour_cooldown_but_manual_does_not()
     {
         var c = Sut();
         await c.CheckAsync(false);
         _service.ClearReceivedCalls();
-        _now = _now.AddHours(5);
+        _now = _now.AddMinutes(30);
         await c.CheckAsync(false);
         await _service.DidNotReceiveWithAnyArgs().CheckAsync(default);
         await c.CheckAsync(true);
         await _service.ReceivedWithAnyArgs(1).CheckAsync(default);
-        _now = _now.AddHours(7);
+        _now = _now.AddHours(2);
         await c.CheckAsync(false);
         await _service.ReceivedWithAnyArgs(2).CheckAsync(default);
     }

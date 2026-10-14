@@ -30,6 +30,10 @@
             </Border>
           </c:SettingsRow>
           <Border Classes="divider" />
+          <c:SettingsRow Title="Keep running in the background" Description="Closing the window hides Snaply in the system tray so your keyboard shortcuts keep working. Use the tray menu to quit.">
+            <ToggleSwitch IsChecked="{Binding RunInBackground}" OnContent="" OffContent="" AutomationProperties.Name="Keep running in the background" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
           <c:SettingsRow Title="Reduce motion" Description="Turns off sliding and fading animations.">
             <ToggleSwitch IsChecked="{Binding ReduceMotion}" OnContent="" OffContent="" AutomationProperties.Name="Reduce motion" />
           </c:SettingsRow>
@@ -203,7 +207,7 @@
             </StackPanel>
           </c:SettingsRow>
           <Border Classes="divider" />
-          <c:SettingsRow Title="Check automatically" Description="Looks for a new version shortly after Snaply starts, at most every 6 hours. Turn off to check only when you press the button.">
+          <c:SettingsRow Title="Check automatically" Description="Looks for a new version shortly after Snaply starts, at most once an hour. Turn off to check only when you press the button.">
             <ToggleSwitch IsChecked="{Binding $parent[UserControl].((vm:SettingsViewModel)DataContext).AutoCheckUpdates}" OnContent="" OffContent="" AutomationProperties.Name="Check for updates automatically" />
           </c:SettingsRow>
         </StackPanel>

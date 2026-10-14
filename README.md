@@ -17,7 +17,7 @@ Verified = built and exercised on that OS. Only **Windows 11** has been run so f
 | Global shortcuts | Implemented (`RegisterHotKey`), not individually verified | **Not implemented** (explained in UI; use `snaply --capture-region` bound in System Settings) | **Not implemented** (X11 planned; Wayland forbids it) |
 | Clipboard (image/text) | Implemented | Implemented, unverified (pbcopy/osascript) | Implemented, unverified (xclip / wl-copy) |
 | OCR (Tesseract, local) | Engine integrated; recognition needs `eng.traineddata` (see below) | Unverified | Unverified |
-| System tray | Not implemented | Not implemented | Not implemented |
+| System tray (run in background) | Implemented; closing the window keeps the process alive (checked); tray menu not checked by eye | Unverified | Unverified (needs a tray-capable desktop) |
 | Window capture (P1) | Not implemented | — | — |
 | OCR text blocks / selection (P1) | Not implemented | — | — |
 

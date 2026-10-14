@@ -17,7 +17,7 @@ Use semantic versions (`MAJOR.MINOR.PATCH`). Pre-release suffixes are not offere
 
 ## How users get updates
 
-- Installed copies (from `SnaplyApp-win-Setup.exe`) check the GitHub release feed ~10 s after start, at most every 6 hours, when **Settings → Updates → Check automatically** is on. A banner offers **Update now**, **Release notes** and **Later**. Nothing downloads or restarts without a click.
+- Installed copies (from `SnaplyApp-win-Setup.exe`) check the GitHub release feed ~10 s after start, at most once an hour, and again every 30 minutes while the app keeps running in the tray, when **Settings → Updates → Check automatically** is on. A banner offers **Update now**, **Release notes** and **Later**. Nothing downloads or restarts without a click.
 - After downloading, the user chooses **Restart to update** (blocked while a capture overlay is open; asks for confirmation if the editor is open — edits are saved automatically) or **Install on next launch**.
 - **Settings → Updates → Check for updates** always checks manually and reports the result.
 - Builds that were not installed with the installer (Rider, `dotnet run`, unzipped publish) show "Updates are only available in the installed version".

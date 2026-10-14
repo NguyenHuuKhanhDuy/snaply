@@ -75,22 +75,33 @@ public sealed record HotkeyGesture(HotkeyModifiers Modifiers, string Key)
         }
 
         if (key is null) { error = "Shortcut needs a key besides modifiers."; return false; }
-        if (mods == HotkeyModifiers.None) { error = "Global shortcuts need at least one modifier (Ctrl, Alt, Shift or Meta)."; return false; }
+        if (mods == HotkeyModifiers.None && !CanBeUsedAlone(key))
+        {
+            error = "Letters, digits and other typing keys need a modifier (Ctrl, Alt, Shift or Meta). Only PrintScreen and F12013F24 can be used alone.";
+            return false;
+        }
         gesture = new HotkeyGesture(mods, key);
         return true;
     }
+
+    /// <summary>Keys that are safe as a global shortcut without a modifier because they are not used for typing.</summary>
+    public static bool CanBeUsedAlone(string key) =>
+        key == "PrintScreen" || (key.Length is 2 or 3 && key[0] == 'F' && int.TryParse(key.AsSpan(1), out var f) && f is >= 1 and <= 24);
+
+    private static readonly Dictionary<string, string> NamedKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["space"] = "Space", ["enter"] = "Enter", ["tab"] = "Tab", ["escape"] = "Escape", ["home"] = "Home", ["end"] = "End",
+        ["insert"] = "Insert", ["delete"] = "Delete", ["pageup"] = "PageUp", ["pagedown"] = "PageDown",
+        ["up"] = "Up", ["down"] = "Down", ["left"] = "Left", ["right"] = "Right",
+        ["printscreen"] = "PrintScreen", ["prtsc"] = "PrintScreen", ["prtscn"] = "PrintScreen", ["snapshot"] = "PrintScreen",
+    };
 
     private static string? NormalizeKey(string raw)
     {
         if (raw.Length == 1 && char.IsLetterOrDigit(raw[0])) return raw.ToUpperInvariant();
         var upper = raw.ToUpperInvariant();
         if (upper.Length is 2 or 3 && upper[0] == 'F' && int.TryParse(upper.AsSpan(1), out var f) && f is >= 1 and <= 24) return upper;
-        return upper switch
-        {
-            "SPACE" or "ENTER" or "TAB" or "ESCAPE" or "HOME" or "END" or "INSERT" or "DELETE"
-                or "PAGEUP" or "PAGEDOWN" or "UP" or "DOWN" or "LEFT" or "RIGHT" or "PRINTSCREEN" => upper[0] + upper[1..].ToLowerInvariant(),
-            _ => null,
-        };
+        return NamedKeys.GetValueOrDefault(raw);
     }
 }
 

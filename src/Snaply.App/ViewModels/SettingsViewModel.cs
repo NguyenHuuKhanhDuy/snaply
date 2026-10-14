@@ -102,6 +102,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _isSystem;
     [ObservableProperty] private bool _reduceMotion;
     [ObservableProperty] private bool _autoCheckUpdates;
+    [ObservableProperty] private bool _runInBackground;
 
     // Capture
     [ObservableProperty] private string _saveDirectory = "";
@@ -157,6 +158,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             IsLight = s.Theme == ThemeMode.Light; IsDark = s.Theme == ThemeMode.Dark; IsSystem = s.Theme == ThemeMode.System;
             ReduceMotion = s.ReduceMotion;
             AutoCheckUpdates = s.AutoCheckUpdates;
+            RunInBackground = s.RunInBackground;
             SaveDirectory = _settings.EffectiveSaveDirectory;
             UsesDefaultDirectory = string.IsNullOrWhiteSpace(s.SaveDirectory);
             FormatIndex = s.DefaultFormat == ImageFormat.Jpeg ? 1 : 0;
@@ -210,6 +212,8 @@ public sealed partial class SettingsViewModel : ViewModelBase
         await ApplyAsync(s => s.Theme = mode).ConfigureAwait(true);
         _theme.Apply(_settings.Current.Theme);
     }
+
+    partial void OnRunInBackgroundChanged(bool value) => _ = ApplyAsync(s => s.RunInBackground = value);
 
     partial void OnAutoCheckUpdatesChanged(bool value) => _ = ApplyAsync(s => s.AutoCheckUpdates = value);
 

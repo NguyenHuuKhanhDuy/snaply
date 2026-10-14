@@ -107,7 +107,9 @@ public sealed class WindowsHotkeyService : IGlobalHotkeyService
                     lock (_callbacks) _callbacks.Remove(previous.Id);
                 }
                 return error == Native.ERROR_HOTKEY_ALREADY_REGISTERED
-                    ? new HotkeyRegistration(HotkeyStatus.Conflict, $"{gesture} is already used by another application.")
+                    ? new HotkeyRegistration(HotkeyStatus.Conflict, gesture.Key == "PrintScreen" && gesture.Modifiers == HotkeyModifiers.None
+                        ? "Print Screen is already taken. Windows may be using it for Snipping Tool: turn that off in Settings > Accessibility > Keyboard (\"Use the Print screen button to open screen capture\"), or close the other app that uses it."
+                        : $"{gesture} is already used by another application.")
                     : new HotkeyRegistration(HotkeyStatus.Failed, $"Windows rejected {gesture}: {new Win32Exception(error).Message}");
             }, new HotkeyRegistration(HotkeyStatus.Failed, "Timed out while registering the shortcut."));
         }
