@@ -50,9 +50,13 @@ jobs:
             exit 1
           fi
 
-      # Never ship a build that does not pass the tests.
+      # Never ship a build that does not pass the tests. The screenshot-rendering suite (every page, both themes, three sizes) takes
+      # several minutes and only produces review images, so it is left out here; run it locally with --filter "Category=Screenshots".
+      - name: Build
+        run: dotnet build Snaply.sln -c Release --nologo -v q
+
       - name: Test
-        run: dotnet test Snaply.sln -c Release
+        run: dotnet test Snaply.sln -c Release --no-build --nologo --filter "Category!=Screenshots"
 
       - name: Publish
         run: >

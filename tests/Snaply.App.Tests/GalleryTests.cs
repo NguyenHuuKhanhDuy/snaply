@@ -14,21 +14,23 @@ public class GalleryTests
 {
     private static readonly DateTime Today = new(2026, 6, 15);
 
-    /// <summary>Adds rows straight to the repository, newest first, one per entry of <paramref name="daysAgo"/> (local noon on that day).</summary>
+    /// <summary>Adds rows straight to the database in one save, newest first, one per entry of <paramref name="daysAgo"/> (local noon on that day).</summary>
     private static async Task SeedAsync(UiFixture fx, IEnumerable<int> daysAgo)
     {
-        var repo = fx.Services.GetRequiredService<IScreenshotRepository>();
+        var factory = fx.Services.GetRequiredService<Microsoft.EntityFrameworkCore.IDbContextFactory<Snaply.Infrastructure.Persistence.SnaplyDbContext>>();
+        await using var db = await factory.CreateDbContextAsync();
         var n = 0;
         foreach (var d in daysAgo)
         {
             var local = Today.AddDays(-d).AddHours(12).AddSeconds(-n);
-            await repo.AddAsync(new Screenshot
+            db.Screenshots.Add(new Screenshot
             {
                 FilePath = Path.Combine(fx.Root, $"seed-{n}.png"), FileName = $"seed-{n}.png", CreatedAt = local.ToUniversalTime(),
                 Width = 800, Height = 600, Format = "png", FileSize = 1000 + n,
             });
             n++;
         }
+        await db.SaveChangesAsync();
     }
 
     private static async Task<GalleryViewModel> OpenAsync(UiFixture fx)

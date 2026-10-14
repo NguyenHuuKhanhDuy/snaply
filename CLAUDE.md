@@ -39,8 +39,8 @@ Local-first, privacy-first screenshot app (Windows verified; macOS/Linux impleme
 ```bash
 dotnet build Snaply.sln
 dotnet run --project src/Snaply.App
-dotnet test                                  # ~8 min total; App.Tests dominates
-dotnet test tests/Snaply.App.Tests --filter "Category!=Screenshots"   # ~2 min, skips PNG renders
+dotnet test --filter "Category!=Screenshots"      # ~1.5 min: what the release workflow runs
+dotnet test                                  # ~6 min: also renders every page to PNG (Screenshots category)
 SNAPLY_UI_PAGES=settings,gallery dotnet test tests/Snaply.App.Tests --filter "Category=Screenshots"   # renders to artifacts/ui/<state>/<theme>/<size>/<page>.png
 ```
 - If the user's IDE/app has the Debug output locked, add `--artifacts-path /tmp/art` (or `-o /tmp/x`).

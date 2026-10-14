@@ -10,7 +10,7 @@ Releases are built by `.github/workflows/release.yml` (Velopack + GitHub Release
    git tag v0.2.0
    git push origin v0.2.0
    ```
-3. The workflow runs the tests, publishes `win-x64` self-contained, packs with `vpk` (installer, full package, delta against the previous release), uploads a GitHub release named `Snaply v0.2.0`, then checks that `releases/latest/download/releases.win.json` lists the version. A red check means installed apps would not see the update.
+3. The workflow runs the tests (everything except the slow screenshot-rendering suite: `--filter "Category!=Screenshots"`), publishes `win-x64` self-contained, packs with `vpk` (installer, full package, delta against the previous release), uploads a GitHub release named `Snaply v0.2.0`, then checks that `releases/latest/download/releases.win.json` lists the version. A red check means installed apps would not see the update.
 4. Run the workflow manually (Actions → Release → Run workflow) for a dry run: it builds a throwaway `0.0.1-ci.N` package and publishes nothing.
 
 Use semantic versions (`MAJOR.MINOR.PATCH`). Pre-release suffixes are not offered to users.
