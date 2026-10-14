@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>false</IsPackable></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="NSubstitute" />
+    <ProjectReference Include="..\..\src\Snaply.Infrastructure\Snaply.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Snaply.Core\Snaply.Core.csproj" />
+    <ProjectReference Include="..\..\src\Snaply.Editor\Snaply.Editor.csproj" />
+  </ItemGroup>
+  <ItemGroup><Using Include="Xunit" /></ItemGroup>
+</Project>

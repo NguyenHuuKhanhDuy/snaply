@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Snaply.Core\Snaply.Core.csproj" />
+    <PackageReference Include="SkiaSharp" />
+    <InternalsVisibleTo Include="Snaply.Editor.Tests" />
+  </ItemGroup>
+</Project>

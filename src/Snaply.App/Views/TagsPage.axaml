@@ -1,0 +1,45 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Snaply.App.ViewModels"
+             xmlns:c="using:Snaply.App.Controls"
+             xmlns:v="using:Snaply.App.Views"
+             x:Class="Snaply.App.Views.TagsPage"
+             x:DataType="vm:TagsViewModel">
+  <Grid>
+    <c:EmptyState IsVisible="{Binding ShowNoTags}" Icon="{DynamicResource IconTag}" Title="No tags yet"
+                  Description="Tag screenshots from their details panel in All Screenshots to group them here." />
+    <Grid ColumnDefinitions="260,*" IsVisible="{Binding !ShowNoTags}">
+      <Border Background="{DynamicResource BackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+        <Grid RowDefinitions="Auto,*" Margin="16,24,12,16">
+          <TextBlock Text="Tags" Classes="title" Margin="8,0,0,14" />
+          <ScrollViewer Grid.Row="1">
+            <ItemsControl ItemsSource="{Binding Tags}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:TagListItem">
+                  <Grid>
+                    <Button Classes="nav" Classes.active="{Binding IsSelected}"
+                            Command="{Binding $parent[ItemsControl].((vm:TagsViewModel)DataContext).SelectCommand}" CommandParameter="{Binding}"
+                            AutomationProperties.Name="{Binding Name}">
+                      <Grid ColumnDefinitions="Auto,*,Auto" Width="200">
+                        <c:Icon Data="{DynamicResource IconTag}" Size="16" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" Margin="10,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="2" Text="{Binding Count}" Classes="caption tertiary" VerticalAlignment="Center" Margin="0,0,26,0" />
+                      </Grid>
+                    </Button>
+                    <Button Classes="icon" Width="24" Height="24" HorizontalAlignment="Right" Margin="0,0,6,0"
+                            Command="{Binding $parent[ItemsControl].((vm:TagsViewModel)DataContext).DeleteTagCommand}" CommandParameter="{Binding}"
+                            ToolTip.Tip="Delete tag" AutomationProperties.Name="Delete tag">
+                      <c:Icon Data="{DynamicResource IconTrash}" Size="13" />
+                    </Button>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+      <v:GalleryPage Grid.Column="1" DataContext="{Binding Gallery}" />
+    </Grid>
+  </Grid>
+</UserControl>

@@ -1,0 +1,48 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Snaply.App.ViewModels"
+             xmlns:c="using:Snaply.App.Controls"
+             x:Class="Snaply.App.Views.OcrPanel"
+             x:DataType="vm:OcrPanelViewModel">
+  <StackPanel Spacing="10">
+    <Grid ColumnDefinitions="*,Auto">
+      <StackPanel Spacing="1">
+        <TextBlock Text="Extract text (OCR)" Classes="sectionLabel" />
+        <TextBlock Classes="caption tertiary" IsVisible="{Binding IsAvailable}">
+          <Run Text="Local · " /><Run Text="{Binding LanguageSummary}" />
+        </TextBlock>
+      </StackPanel>
+      <Button Grid.Column="1" Classes="secondary" Command="{Binding RunCommand}" IsVisible="{Binding !IsRunning}" MinHeight="30" Padding="12,5">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <c:Icon Data="{DynamicResource IconOcr}" Size="15" />
+          <TextBlock Text="{Binding RunLabel}" />
+        </StackPanel>
+      </Button>
+      <Button Grid.Column="1" Classes="secondary" Command="{Binding CancelCommand}" IsVisible="{Binding IsRunning}" MinHeight="30" Padding="12,5" Content="Cancel" />
+    </Grid>
+
+    <StackPanel IsVisible="{Binding IsRunning}" Spacing="6">
+      <ProgressBar IsIndeterminate="True" Height="4" />
+      <TextBlock Text="Reading text from the image…" Classes="caption secondary" />
+    </StackPanel>
+
+    <Border Background="{DynamicResource WarningSoftBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding !IsAvailable}">
+      <TextBlock Text="{Binding UnavailableReason}" TextWrapping="Wrap" Classes="caption" />
+    </Border>
+
+    <Border Background="{DynamicResource ErrorSoftBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding HasError}">
+      <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" Classes="caption" />
+    </Border>
+
+    <TextBlock Text="{Binding InfoMessage}" Classes="caption secondary" TextWrapping="Wrap" IsVisible="{Binding InfoMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    <TextBlock Text="Nothing extracted yet. Run OCR to read the text in this screenshot." Classes="caption secondary" TextWrapping="Wrap" IsVisible="{Binding ShowEmptyHint}" />
+
+    <StackPanel Spacing="8" IsVisible="{Binding HasText}">
+      <TextBox Text="{Binding Text, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="200" MinHeight="80"
+               FontFamily="{DynamicResource MonoFont}" FontSize="12.5" AutomationProperties.Name="Extracted text" />
+      <Button Classes="secondary" Command="{Binding CopyCommand}" HorizontalAlignment="Left">
+        <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Data="{DynamicResource IconCopy}" Size="15" /><TextBlock Text="Copy text" /></StackPanel>
+      </Button>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

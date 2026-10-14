@@ -1,0 +1,98 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Snaply.App.ViewModels"
+             xmlns:c="using:Snaply.App.Controls"
+             x:Class="Snaply.App.Views.HomePage"
+             x:DataType="vm:HomeViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel MaxWidth="1040" Margin="32,28,32,32" Spacing="26" HorizontalAlignment="Stretch">
+
+      <StackPanel Spacing="4">
+        <TextBlock Text="Home" Classes="title" />
+        <TextBlock Text="Capture, annotate, extract text, organize, export." Classes="secondary" />
+      </StackPanel>
+
+      <Border Classes="card" IsVisible="{Binding !CaptureSupported}" Background="{DynamicResource WarningSoftBrush}" BorderBrush="{DynamicResource WarningBrush}" Padding="16,12">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <c:Icon Data="{DynamicResource IconAlert}" Stroke="{DynamicResource WarningBrush}" />
+          <TextBlock Text="{Binding CaptureUnsupportedReason}" TextWrapping="Wrap" MaxWidth="820" />
+        </StackPanel>
+      </Border>
+
+      <!-- Capture actions -->
+      <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto">
+        <Button Classes="tile" Padding="20" Command="{Binding CaptureRegionCommand}" IsEnabled="{Binding CaptureSupported}" HorizontalAlignment="Stretch"
+                AutomationProperties.Name="Capture region">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource AccentSoftBrush}" VerticalAlignment="Top">
+              <c:Icon Data="{DynamicResource IconCapture}" Size="22" Stroke="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="3">
+              <TextBlock Text="Capture region" Classes="subtitle" />
+              <TextBlock Text="Drag over any part of your screen" Classes="secondary" TextWrapping="Wrap" />
+            </StackPanel>
+            <c:KeyCaps Grid.Column="2" Gesture="{Binding RegionShortcut}" VerticalAlignment="Top" />
+          </Grid>
+        </Button>
+        <Button Grid.Column="2" Classes="tile" Padding="20" Command="{Binding CaptureFullScreenCommand}" IsEnabled="{Binding CaptureSupported}" HorizontalAlignment="Stretch"
+                AutomationProperties.Name="Capture full screen">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <Border Width="44" Height="44" CornerRadius="10" Background="{DynamicResource AccentSoftBrush}" VerticalAlignment="Top">
+              <c:Icon Data="{DynamicResource IconMonitor}" Size="22" Stroke="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="3">
+              <TextBlock Text="Capture full screen" Classes="subtitle" />
+              <TextBlock Text="The whole monitor, instantly" Classes="secondary" TextWrapping="Wrap" />
+            </StackPanel>
+            <c:KeyCaps Grid.Column="2" Gesture="{Binding FullScreenShortcut}" VerticalAlignment="Top" />
+          </Grid>
+        </Button>
+      </Grid>
+
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Classes="secondary" Command="{Binding CaptureDelayedCommand}" IsEnabled="{Binding CaptureSupported}" ToolTip.Tip="Start a region capture after a 5 second countdown">
+          <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Data="{DynamicResource IconRefresh}" Size="16" /><TextBlock Text="Capture in 5 seconds" /></StackPanel>
+        </Button>
+        <Button Classes="secondary" Command="{Binding RepeatLastCommand}" IsEnabled="{Binding CanRepeat}" ToolTip.Tip="Capture the same area again">
+          <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Data="{DynamicResource IconRefresh}" Size="16" /><TextBlock Text="Repeat last capture" /></StackPanel>
+        </Button>
+      </StackPanel>
+
+      <Border Classes="card" IsVisible="{Binding HasShortcutNote}" Padding="16,12">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <c:Icon Data="{DynamicResource IconKeyboard}" />
+          <StackPanel Spacing="4" MaxWidth="780">
+            <TextBlock Text="Global shortcuts aren't available here" FontWeight="Medium" />
+            <TextBlock Text="{Binding ShortcutNote}" Classes="caption secondary" TextWrapping="Wrap" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <!-- Recent -->
+      <StackPanel Spacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Text="Recent" Classes="subtitle" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="ghost" Command="{Binding ViewAllCommand}" IsVisible="{Binding HasRecent}">
+            <TextBlock Text="View all" Foreground="{DynamicResource AccentBrush}" FontWeight="Medium" />
+          </Button>
+        </Grid>
+
+        <ItemsControl ItemsSource="{Binding Recent}" IsVisible="{Binding HasRecent}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ScreenshotItemViewModel">
+              <c:ScreenshotTile Margin="0,0,14,14" ClickCommand="{Binding $parent[UserControl].((vm:HomeViewModel)DataContext).OpenItemCommand}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Border Classes="card" Padding="0,40" IsVisible="{Binding ShowEmpty}">
+          <c:EmptyState Icon="{DynamicResource IconImages}" Title="No screenshots yet"
+                        Description="Your captures show up here. Use the buttons above or your keyboard shortcut to take the first one." />
+        </Border>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

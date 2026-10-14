@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+*.user
+publish/
+artifacts/
+TestResults/
+.idea/
+openspec/
+.claude/

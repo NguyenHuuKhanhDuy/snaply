@@ -1,0 +1,117 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+  <!-- Design tokens. Every view references these; no view hardcodes colors. -->
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Light">
+      <Color x:Key="BackgroundColor">#F6F7F9</Color>
+      <Color x:Key="SidebarColor">#EDEFF3</Color>
+      <Color x:Key="SurfaceColor">#FFFFFF</Color>
+      <Color x:Key="SurfaceAltColor">#F1F3F6</Color>
+      <Color x:Key="SurfaceHoverColor">#E8EBF0</Color>
+      <Color x:Key="BorderColor">#DDE1E8</Color>
+      <Color x:Key="BorderStrongColor">#C3C9D4</Color>
+      <Color x:Key="TextPrimaryColor">#14171F</Color>
+      <Color x:Key="TextSecondaryColor">#5B6272</Color>
+      <Color x:Key="TextTertiaryColor">#8A91A1</Color>
+      <Color x:Key="AccentColor">#3B5BDB</Color>
+      <Color x:Key="AccentHoverColor">#2F4AC0</Color>
+      <Color x:Key="AccentPressedColor">#2640A8</Color>
+      <Color x:Key="AccentSoftColor">#E4E9FB</Color>
+      <Color x:Key="OnAccentColor">#FFFFFF</Color>
+      <Color x:Key="SelectionColor">#DCE3FA</Color>
+      <Color x:Key="SuccessColor">#1F8A5B</Color>
+      <Color x:Key="SuccessSoftColor">#DFF3EA</Color>
+      <Color x:Key="WarningColor">#B46A00</Color>
+      <Color x:Key="WarningSoftColor">#FCEFD6</Color>
+      <Color x:Key="ErrorColor">#C9342F</Color>
+      <Color x:Key="ErrorSoftColor">#FBE3E1</Color>
+      <Color x:Key="InfoSoftColor">#E4E9FB</Color>
+      <Color x:Key="ScrimColor">#66101420</Color>
+      <Color x:Key="CanvasColor">#E3E6EC</Color>
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Dark">
+      <Color x:Key="BackgroundColor">#0F1218</Color>
+      <Color x:Key="SidebarColor">#151922</Color>
+      <Color x:Key="SurfaceColor">#1A1F29</Color>
+      <Color x:Key="SurfaceAltColor">#212733</Color>
+      <Color x:Key="SurfaceHoverColor">#2A3140</Color>
+      <Color x:Key="BorderColor">#2B3240</Color>
+      <Color x:Key="BorderStrongColor">#3C4558</Color>
+      <Color x:Key="TextPrimaryColor">#EEF0F5</Color>
+      <Color x:Key="TextSecondaryColor">#A5ACBB</Color>
+      <Color x:Key="TextTertiaryColor">#7A8192</Color>
+      <Color x:Key="AccentColor">#7C93F5</Color>
+      <Color x:Key="AccentHoverColor">#92A5F7</Color>
+      <Color x:Key="AccentPressedColor">#6B82E8</Color>
+      <Color x:Key="AccentSoftColor">#242C4D</Color>
+      <Color x:Key="OnAccentColor">#0B1020</Color>
+      <Color x:Key="SelectionColor">#2A3560</Color>
+      <Color x:Key="SuccessColor">#4CC38A</Color>
+      <Color x:Key="SuccessSoftColor">#17352A</Color>
+      <Color x:Key="WarningColor">#F0B24A</Color>
+      <Color x:Key="WarningSoftColor">#3A2D14</Color>
+      <Color x:Key="ErrorColor">#F2776F</Color>
+      <Color x:Key="ErrorSoftColor">#3C1D1C</Color>
+      <Color x:Key="InfoSoftColor">#242C4D</Color>
+      <Color x:Key="ScrimColor">#99000000</Color>
+      <Color x:Key="CanvasColor">#0B0E13</Color>
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+
+  <SolidColorBrush x:Key="BackgroundBrush" Color="{DynamicResource BackgroundColor}" />
+  <SolidColorBrush x:Key="SidebarBrush" Color="{DynamicResource SidebarColor}" />
+  <SolidColorBrush x:Key="SurfaceBrush" Color="{DynamicResource SurfaceColor}" />
+  <SolidColorBrush x:Key="SurfaceAltBrush" Color="{DynamicResource SurfaceAltColor}" />
+  <SolidColorBrush x:Key="SurfaceHoverBrush" Color="{DynamicResource SurfaceHoverColor}" />
+  <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderColor}" />
+  <SolidColorBrush x:Key="BorderStrongBrush" Color="{DynamicResource BorderStrongColor}" />
+  <SolidColorBrush x:Key="TextPrimaryBrush" Color="{DynamicResource TextPrimaryColor}" />
+  <SolidColorBrush x:Key="TextSecondaryBrush" Color="{DynamicResource TextSecondaryColor}" />
+  <SolidColorBrush x:Key="TextTertiaryBrush" Color="{DynamicResource TextTertiaryColor}" />
+  <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}" />
+  <SolidColorBrush x:Key="AccentHoverBrush" Color="{DynamicResource AccentHoverColor}" />
+  <SolidColorBrush x:Key="AccentPressedBrush" Color="{DynamicResource AccentPressedColor}" />
+  <SolidColorBrush x:Key="AccentSoftBrush" Color="{DynamicResource AccentSoftColor}" />
+  <SolidColorBrush x:Key="OnAccentBrush" Color="{DynamicResource OnAccentColor}" />
+  <SolidColorBrush x:Key="SelectionBrush" Color="{DynamicResource SelectionColor}" />
+  <SolidColorBrush x:Key="SuccessBrush" Color="{DynamicResource SuccessColor}" />
+  <SolidColorBrush x:Key="SuccessSoftBrush" Color="{DynamicResource SuccessSoftColor}" />
+  <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}" />
+  <SolidColorBrush x:Key="WarningSoftBrush" Color="{DynamicResource WarningSoftColor}" />
+  <SolidColorBrush x:Key="ErrorBrush" Color="{DynamicResource ErrorColor}" />
+  <SolidColorBrush x:Key="ErrorSoftBrush" Color="{DynamicResource ErrorSoftColor}" />
+  <SolidColorBrush x:Key="InfoSoftBrush" Color="{DynamicResource InfoSoftColor}" />
+  <SolidColorBrush x:Key="ScrimBrush" Color="{DynamicResource ScrimColor}" />
+  <SolidColorBrush x:Key="CanvasBrush" Color="{DynamicResource CanvasColor}" />
+
+  <!-- Spacing -->
+  <sys:Double x:Key="SpaceXs">4</sys:Double>
+  <sys:Double x:Key="SpaceSm">8</sys:Double>
+  <sys:Double x:Key="SpaceMd">12</sys:Double>
+  <sys:Double x:Key="SpaceLg">16</sys:Double>
+  <sys:Double x:Key="SpaceXl">24</sys:Double>
+  <sys:Double x:Key="Space2xl">32</sys:Double>
+
+  <!-- Corner radii -->
+  <CornerRadius x:Key="RadiusSm">6</CornerRadius>
+  <CornerRadius x:Key="RadiusMd">8</CornerRadius>
+  <CornerRadius x:Key="RadiusLg">12</CornerRadius>
+  <CornerRadius x:Key="RadiusPill">999</CornerRadius>
+
+  <!-- Typography -->
+  <FontFamily x:Key="UiFont">fonts:Inter#Inter, Segoe UI, SF Pro Text, Helvetica Neue, sans-serif</FontFamily>
+  <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas, Menlo, monospace</FontFamily>
+  <sys:Double x:Key="FontSizeCaption">12</sys:Double>
+  <sys:Double x:Key="FontSizeBody">13.5</sys:Double>
+  <sys:Double x:Key="FontSizeSubtitle">15</sys:Double>
+  <sys:Double x:Key="FontSizeTitle">22</sys:Double>
+  <sys:Double x:Key="FontSizeDisplay">28</sys:Double>
+
+  <!-- Motion; set to 0 by the app when reduced motion is on -->
+  <sys:TimeSpan x:Key="MotionFast">0:0:0.12</sys:TimeSpan>
+  <sys:TimeSpan x:Key="MotionNormal">0:0:0.20</sys:TimeSpan>
+
+  <BoxShadows x:Key="ElevationSm">0 1 2 0 #14000000</BoxShadows>
+  <BoxShadows x:Key="ElevationMd">0 8 24 0 #33000000</BoxShadows>
+</ResourceDictionary>

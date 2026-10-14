@@ -1,0 +1,208 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Snaply.App.ViewModels"
+             xmlns:c="using:Snaply.App.Controls"
+             x:Class="Snaply.App.Views.SettingsPage"
+             x:DataType="vm:SettingsViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel MaxWidth="820" Margin="32,28,32,40" Spacing="28" HorizontalAlignment="Stretch">
+      <StackPanel Spacing="4">
+        <TextBlock Text="Settings" Classes="title" />
+        <TextBlock Text="Changes are saved automatically." Classes="secondary" />
+      </StackPanel>
+
+      <!-- Appearance -->
+      <c:SectionCard Title="Appearance" Description="Choose how Snaply looks. System follows your operating system.">
+        <StackPanel>
+          <c:SettingsRow Title="Theme">
+            <Border Background="{DynamicResource SurfaceAltBrush}" CornerRadius="8" Padding="3">
+              <StackPanel Orientation="Horizontal" Spacing="2">
+                <ToggleButton Classes="segment" IsChecked="{Binding IsLight}" AutomationProperties.Name="Light theme">
+                  <StackPanel Orientation="Horizontal" Spacing="7"><c:Icon Data="{DynamicResource IconSun}" Size="15" /><TextBlock Text="Light" /></StackPanel>
+                </ToggleButton>
+                <ToggleButton Classes="segment" IsChecked="{Binding IsDark}" AutomationProperties.Name="Dark theme">
+                  <StackPanel Orientation="Horizontal" Spacing="7"><c:Icon Data="{DynamicResource IconMoon}" Size="15" /><TextBlock Text="Dark" /></StackPanel>
+                </ToggleButton>
+                <ToggleButton Classes="segment" IsChecked="{Binding IsSystem}" AutomationProperties.Name="System theme">
+                  <StackPanel Orientation="Horizontal" Spacing="7"><c:Icon Data="{DynamicResource IconAuto}" Size="15" /><TextBlock Text="System" /></StackPanel>
+                </ToggleButton>
+              </StackPanel>
+            </Border>
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Reduce motion" Description="Turns off sliding and fading animations.">
+            <ToggleSwitch IsChecked="{Binding ReduceMotion}" OnContent="" OffContent="" AutomationProperties.Name="Reduce motion" />
+          </c:SettingsRow>
+        </StackPanel>
+      </c:SectionCard>
+
+      <!-- Capture -->
+      <c:SectionCard Title="Capture" Description="What happens after you take a screenshot.">
+        <StackPanel>
+          <c:SettingsRow Title="Save location" Description="{Binding SaveDirectory}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="ghost" Content="Use default" Command="{Binding ResetDirectoryCommand}" IsEnabled="{Binding !UsesDefaultDirectory}" />
+              <Button Classes="secondary" Content="Choose folder…" Command="{Binding ChooseDirectoryCommand}" />
+            </StackPanel>
+          </c:SettingsRow>
+          <TextBlock Text="{Binding CaptureError}" Classes="caption error" IsVisible="{Binding CaptureError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Margin="0,0,0,10" />
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Image format" Description="Used for new captures and edited copies.">
+            <ComboBox ItemsSource="{Binding FormatOptions}" SelectedIndex="{Binding FormatIndex}" MinWidth="170" AutomationProperties.Name="Image format" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Auto-save captures" Description="On: every capture goes to your library right away. Off: nothing is saved until you press Save on the capture toolbar.">
+            <ToggleSwitch IsChecked="{Binding SaveToLibrary}" OnContent="" OffContent="" AutomationProperties.Name="Save captures to library" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Edit right after selecting" Description="Annotate the chosen area on the capture overlay (arrows, text, blur…) like Lightshot, without opening the editor.">
+            <ToggleSwitch IsChecked="{Binding EditAfterSelection}" OnContent="" OffContent="" AutomationProperties.Name="Edit on the capture overlay" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Copy to clipboard" Description="Also place each capture on the clipboard.">
+            <ToggleSwitch IsChecked="{Binding CopyToClipboard}" OnContent="" OffContent="" AutomationProperties.Name="Copy captures to clipboard" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Open editor after capture" Description="Jump straight into annotating.">
+            <ToggleSwitch IsChecked="{Binding OpenEditorAfter}" OnContent="" OffContent="" AutomationProperties.Name="Open editor after capture" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Full screen includes all monitors" Description="Off captures only the monitor under the cursor.">
+            <ToggleSwitch IsChecked="{Binding AllMonitors}" OnContent="" OffContent="" AutomationProperties.Name="Full screen captures all monitors" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Capture delay" Description="Seconds to wait before capturing, so you can open a menu first.">
+            <ComboBox ItemsSource="{Binding DelayOptions}" SelectedItem="{Binding DelaySeconds}" MinWidth="110" AutomationProperties.Name="Capture delay in seconds" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Screen capture support" Description="{Binding CaptureSupportText}">
+            <Button Classes="secondary" Content="Open system privacy settings" Command="{Binding OpenPermissionSettingsCommand}" IsVisible="{Binding NeedsCapturePermission}" />
+          </c:SettingsRow>
+        </StackPanel>
+      </c:SectionCard>
+
+      <!-- Shortcuts -->
+      <c:SectionCard Title="Keyboard shortcuts" Description="Global shortcuts work while Snaply runs in the background. Press Esc to cancel while recording.">
+        <StackPanel>
+          <Border Background="{DynamicResource WarningSoftBrush}" CornerRadius="8" Padding="14,12" Margin="0,10,0,6" IsVisible="{Binding HasShortcutBanner}">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <c:Icon Data="{DynamicResource IconAlert}" Stroke="{DynamicResource WarningBrush}" VerticalAlignment="Top" />
+              <TextBlock Text="{Binding ShortcutBanner}" TextWrapping="Wrap" MaxWidth="640" />
+            </StackPanel>
+          </Border>
+          <ItemsControl ItemsSource="{Binding Shortcuts}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ShortcutRowViewModel">
+                <StackPanel>
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,12">
+                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Label}" FontWeight="Medium" />
+                      <TextBlock Text="{Binding Description}" Classes="caption secondary" />
+                      <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <Border Width="7" Height="7" CornerRadius="4" VerticalAlignment="Center" Classes.ok="{Binding StatusIsOk}" Classes.bad="{Binding StatusIsError}">
+                          <Border.Styles>
+                            <Style Selector="Border"><Setter Property="Background" Value="{DynamicResource TextTertiaryBrush}" /></Style>
+                            <Style Selector="Border.ok"><Setter Property="Background" Value="{DynamicResource SuccessBrush}" /></Style>
+                            <Style Selector="Border.bad"><Setter Property="Background" Value="{DynamicResource ErrorBrush}" /></Style>
+                          </Border.Styles>
+                        </Border>
+                        <TextBlock Text="{Binding StatusText}" Classes="caption secondary" TextWrapping="Wrap" MaxWidth="420" />
+                      </StackPanel>
+                      <TextBlock Text="{Binding RecordError}" Classes="caption error" IsVisible="{Binding RecordError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" MaxWidth="420" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <c:KeyCaps Gesture="{Binding Gesture}" IsVisible="{Binding !IsRecording}" VerticalAlignment="Center" />
+                      <Border IsVisible="{Binding IsRecording}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1.5" CornerRadius="6" Padding="10,5" Background="{DynamicResource AccentSoftBrush}">
+                        <TextBlock Text="Press the new shortcut…" Classes="caption" />
+                      </Border>
+                      <Button Classes="secondary" Content="Change" Command="{Binding ChangeCommand}" IsVisible="{Binding !IsRecording}" />
+                      <Button Classes="secondary" Content="Cancel" Command="{Binding CancelRecordingCommand}" IsVisible="{Binding IsRecording}" />
+                      <Button Classes="icon" Command="{Binding ResetCommand}" ToolTip.Tip="Reset to default" AutomationProperties.Name="Reset shortcut"><c:Icon Data="{DynamicResource IconRefresh}" Size="15" /></Button>
+                      <Button Classes="icon" Command="{Binding ClearCommand}" ToolTip.Tip="Remove shortcut" AutomationProperties.Name="Remove shortcut"><c:Icon Data="{DynamicResource IconClose}" Size="15" /></Button>
+                    </StackPanel>
+                  </Grid>
+                  <Border Classes="divider" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </c:SectionCard>
+
+      <!-- OCR -->
+      <c:SectionCard Title="Text recognition (OCR)" Description="Runs entirely on this device. Nothing is uploaded.">
+        <StackPanel>
+          <c:SettingsRow Title="Engine" Description="{Binding OcrEngineText}" />
+          <Border Background="{DynamicResource WarningSoftBrush}" CornerRadius="8" Padding="14,12" Margin="0,0,0,10" IsVisible="{Binding HasOcrNotice}">
+            <TextBlock Text="{Binding OcrNotice}" TextWrapping="Wrap" Classes="caption" />
+          </Border>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Language data folder" Description="{Binding TessdataPath}">
+            <Button Classes="secondary" Content="Open folder" Command="{Binding OpenTessdataFolderCommand}" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <StackPanel Margin="0,12" Spacing="8">
+            <TextBlock Text="Languages" FontWeight="Medium" />
+            <TextBlock Text="Only languages whose data is installed are listed. Select several to recognize mixed-language text." Classes="caption secondary" TextWrapping="Wrap" />
+            <ItemsControl ItemsSource="{Binding Languages}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:OcrLanguageRow">
+                  <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </StackPanel>
+      </c:SectionCard>
+
+      <!-- Storage -->
+      <c:SectionCard Title="Storage" Description="Your screenshots stay in these folders on your device.">
+        <StackPanel>
+          <c:SettingsRow Title="Screenshots" Description="{Binding SaveDirectory}">
+            <Button Classes="secondary" Content="Open folder" Command="{Binding OpenScreenshotFolderCommand}" />
+          </c:SettingsRow>
+          <TextBlock Text="{Binding StorageSummary}" Classes="caption secondary" Margin="0,0,0,12" />
+          <Border Classes="divider" />
+          <c:SettingsRow Title="App data" Description="{Binding DataDirectory}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="secondary" Content="Logs" Command="{Binding OpenLogFolderCommand}" />
+              <Button Classes="secondary" Content="Open folder" Command="{Binding OpenDataFolderCommand}" />
+            </StackPanel>
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Check library" Description="Finds entries whose file is missing and stray files Snaply created. Nothing is deleted without confirmation.">
+            <Button Classes="secondary" Content="Check now" Command="{Binding VerifyLibraryCommand}" IsEnabled="{Binding !IsBusy}" />
+          </c:SettingsRow>
+          <StackPanel Margin="0,0,0,12" Spacing="8" IsVisible="{Binding VerifyResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding VerifyResult}" Classes="caption" TextWrapping="Wrap" />
+            <Button Classes="danger" Content="Remove stray files…" Command="{Binding RemoveOrphansCommand}" IsVisible="{Binding CanRemoveOrphans}" HorizontalAlignment="Left" />
+          </StackPanel>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Clear extracted text" Description="Removes OCR text from the library. Images are kept.">
+            <Button Classes="danger" Content="Clear text…" Command="{Binding ClearOcrTextCommand}" IsEnabled="{Binding !IsBusy}" />
+          </c:SettingsRow>
+          <Border Classes="divider" />
+          <c:SettingsRow Title="Delete all screenshots" Description="Permanently deletes every screenshot, thumbnail, tag link and saved edit.">
+            <Button Classes="danger" Content="Delete all…" Command="{Binding DeleteAllCommand}" IsEnabled="{Binding !IsBusy}" />
+          </c:SettingsRow>
+        </StackPanel>
+      </c:SectionCard>
+
+      <!-- About -->
+      <c:SectionCard Title="About">
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="24" RowSpacing="8" Margin="0,12">
+          <TextBlock Text="Version" Classes="secondary" />
+          <TextBlock Grid.Column="1" Text="{Binding Version}" />
+          <TextBlock Grid.Row="1" Text="Runtime" Classes="secondary" />
+          <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding RuntimeText}" />
+          <TextBlock Grid.Row="2" Text="System" Classes="secondary" />
+          <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding OsText}" TextWrapping="Wrap" />
+          <TextBlock Grid.Row="3" Text="Session" Classes="secondary" />
+          <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SessionText}" />
+          <TextBlock Grid.Row="4" Text="Documentation" Classes="secondary" />
+          <TextBlock Grid.Row="4" Grid.Column="1" Text="README.md and the docs/ folder in the Snaply source repository." TextWrapping="Wrap" />
+        </Grid>
+      </c:SectionCard>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

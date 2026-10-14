@@ -1,0 +1,121 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Snaply.App.ViewModels"
+             xmlns:c="using:Snaply.App.Controls"
+             xmlns:v="using:Snaply.App.Views"
+             x:Class="Snaply.App.Views.DetailsPanel"
+             x:DataType="vm:DetailsViewModel">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="18,16,18,20" Spacing="16">
+
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="Details" Classes="sectionLabel" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Classes="icon" Command="{Binding CloseCommand}" ToolTip.Tip="Close details" AutomationProperties.Name="Close details">
+          <c:Icon Data="{DynamicResource IconClose}" Size="15" />
+        </Button>
+      </Grid>
+
+      <Border Background="{DynamicResource CanvasBrush}" CornerRadius="8" ClipToBounds="True" MinHeight="140" MaxHeight="240" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+        <Grid>
+          <Image Source="{Binding Preview}" Stretch="Uniform" />
+          <StackPanel IsVisible="{Binding PreviewUnavailable}" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8" Margin="12">
+            <c:Icon Data="{DynamicResource IconImageOff}" Size="28" HorizontalAlignment="Center" />
+            <TextBlock Text="The file is missing or unreadable" Classes="caption secondary" HorizontalAlignment="Center" IsVisible="{Binding IsMissing}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Grid ColumnDefinitions="*,Auto">
+        <StackPanel Spacing="2">
+          <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding CreatedText}" Classes="caption secondary" />
+        </StackPanel>
+        <ToggleButton Grid.Column="1" Classes="icon" IsChecked="{Binding IsFavorite, Mode=OneWay}" Command="{Binding ToggleFavoriteCommand}" VerticalAlignment="Top"
+                      ToolTip.Tip="Favorite" AutomationProperties.Name="Toggle favorite" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0">
+          <Panel>
+            <c:Icon Data="{DynamicResource IconStar}" Size="18" IsVisible="{Binding !IsFavorite}" />
+            <c:Icon Data="{DynamicResource IconStar}" Size="18" Stroke="#E0A800" IsVisible="{Binding IsFavorite}" />
+          </Panel>
+        </ToggleButton>
+      </Grid>
+
+      <Border Classes="missing" Background="{DynamicResource WarningSoftBrush}" CornerRadius="8" Padding="12" IsVisible="{Binding IsMissing}">
+        <StackPanel Spacing="8">
+          <TextBlock Text="This screenshot's file was moved or deleted." TextWrapping="Wrap" />
+          <Button Classes="secondary" Content="Remove from library" Command="{Binding RemoveEntryCommand}" HorizontalAlignment="Left" />
+        </StackPanel>
+      </Border>
+
+      <!-- Actions -->
+      <UniformGrid Columns="2" Margin="-3">
+        <Button Classes="primary" Margin="3" HorizontalAlignment="Stretch" Command="{Binding OpenEditorCommand}" IsEnabled="{Binding !IsMissing}">
+          <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Data="{DynamicResource IconEdit}" Size="16" /><TextBlock Text="Edit" Foreground="{DynamicResource OnAccentBrush}" /></StackPanel>
+        </Button>
+        <Button Classes="secondary" Margin="3" HorizontalAlignment="Stretch" Command="{Binding CopyImageCommand}" IsEnabled="{Binding !IsMissing}">
+          <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Data="{DynamicResource IconCopy}" Size="16" /><TextBlock Text="Copy" /></StackPanel>
+        </Button>
+        <Button Classes="secondary" Margin="3" HorizontalAlignment="Stretch" Command="{Binding ExportCommand}" IsEnabled="{Binding !IsMissing}">
+          <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Data="{DynamicResource IconExport}" Size="16" /><TextBlock Text="Export" /></StackPanel>
+        </Button>
+        <Button Classes="secondary" Margin="3" HorizontalAlignment="Stretch" Command="{Binding RevealCommand}" IsVisible="{Binding CanReveal}">
+          <StackPanel Orientation="Horizontal" Spacing="8"><c:Icon Data="{DynamicResource IconFolder}" Size="16" /><TextBlock Text="Show in folder" /></StackPanel>
+        </Button>
+      </UniformGrid>
+
+      <!-- Properties -->
+      <Border Classes="divider" />
+      <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="16">
+        <TextBlock Text="Dimensions" Classes="caption secondary" />
+        <TextBlock Grid.Column="1" Text="{Binding Dimensions}" Classes="caption" />
+        <TextBlock Grid.Row="1" Text="Size" Classes="caption secondary" />
+        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SizeText}" Classes="caption" />
+        <TextBlock Grid.Row="2" Text="Format" Classes="caption secondary" />
+        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding FormatText}" Classes="caption" />
+        <TextBlock Grid.Row="3" Text="Location" Classes="caption secondary" />
+        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding PathText}" Classes="caption" TextWrapping="Wrap" />
+      </Grid>
+
+      <!-- Tags -->
+      <Border Classes="divider" />
+      <StackPanel Spacing="10">
+        <TextBlock Text="Tags" Classes="sectionLabel" />
+        <ItemsControl ItemsSource="{Binding Tags}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:TagViewModel">
+              <Border Classes="chip" Margin="0,0,6,6">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{Binding Name}" Classes="caption" VerticalAlignment="Center" />
+                  <Button Classes="icon" Width="18" Height="18" Command="{Binding $parent[ItemsControl].((vm:DetailsViewModel)DataContext).RemoveTagCommand}" CommandParameter="{Binding}"
+                          ToolTip.Tip="Remove tag" AutomationProperties.Name="Remove tag">
+                    <c:Icon Data="{DynamicResource IconClose}" Size="11" />
+                  </Button>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <TextBox Text="{Binding NewTag}" Watermark="Add a tag" MaxLength="50" AutomationProperties.Name="New tag name">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding AddTagCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          <Button Grid.Column="1" Classes="secondary" Command="{Binding AddTagCommand}" ToolTip.Tip="Add tag" AutomationProperties.Name="Add tag">
+            <c:Icon Data="{DynamicResource IconPlus}" Size="16" />
+          </Button>
+        </Grid>
+        <TextBlock Text="{Binding TagError}" Classes="caption error" IsVisible="{Binding TagError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      </StackPanel>
+
+      <!-- OCR -->
+      <Border Classes="divider" />
+      <v:OcrPanel DataContext="{Binding Ocr}" />
+
+      <Border Classes="divider" />
+      <Button Classes="danger" HorizontalAlignment="Stretch" Command="{Binding DeleteCommand}">
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center"><c:Icon Data="{DynamicResource IconTrash}" Size="16" /><TextBlock Text="Delete screenshot" Foreground="{DynamicResource ErrorBrush}" /></StackPanel>
+      </Button>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

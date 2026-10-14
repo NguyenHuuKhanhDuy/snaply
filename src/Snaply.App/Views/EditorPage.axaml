@@ -1,0 +1,166 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Snaply.App.ViewModels"
+             xmlns:c="using:Snaply.App.Controls"
+             xmlns:v="using:Snaply.App.Views"
+             x:Class="Snaply.App.Views.EditorPage"
+             x:DataType="vm:EditorViewModel"
+             Focusable="True">
+  <UserControl.Styles>
+    <Style Selector="Button.picked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+  </UserControl.Styles>
+  <Grid RowDefinitions="Auto,*,Auto">
+
+    <!-- Top bar -->
+    <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="10,8">
+      <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+        <Button Classes="ghost" Command="{Binding GoBackCommand}" ToolTip.Tip="Back (Esc)" AutomationProperties.Name="Back" Padding="10,6">
+          <StackPanel Orientation="Horizontal" Spacing="6"><c:Icon Data="{DynamicResource IconBack}" Size="16" /><TextBlock Text="Back" /></StackPanel>
+        </Button>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" Margin="10,0,0,0" VerticalAlignment="Center">
+          <Button Classes="icon" Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}" ToolTip.Tip="Undo (Ctrl+Z)" AutomationProperties.Name="Undo"><c:Icon Data="{DynamicResource IconUndo}" Size="17" /></Button>
+          <Button Classes="icon" Command="{Binding RedoCommand}" IsEnabled="{Binding CanRedo}" ToolTip.Tip="Redo (Ctrl+Y)" AutomationProperties.Name="Redo"><c:Icon Data="{DynamicResource IconRedo}" Size="17" /></Button>
+        </StackPanel>
+        <TextBlock Grid.Column="2" Text="{Binding Title}" FontWeight="Medium" HorizontalAlignment="Center" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="12,0" />
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" Margin="0,0,12,0">
+          <Button Classes="icon" Command="{Binding ZoomOutCommand}" ToolTip.Tip="Zoom out (-)" AutomationProperties.Name="Zoom out"><c:Icon Data="{DynamicResource IconZoomOut}" Size="17" /></Button>
+          <TextBlock Text="{Binding ZoomText}" Classes="caption" MinWidth="42" TextAlignment="Center" VerticalAlignment="Center" />
+          <Button Classes="icon" Command="{Binding ZoomInCommand}" ToolTip.Tip="Zoom in (+)" AutomationProperties.Name="Zoom in"><c:Icon Data="{DynamicResource IconZoomIn}" Size="17" /></Button>
+          <Button Classes="icon" Command="{Binding FitCommand}" ToolTip.Tip="Fit to window (0)" AutomationProperties.Name="Fit to window"><c:Icon Data="{DynamicResource IconFit}" Size="17" /></Button>
+        </StackPanel>
+        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Button Classes="icon" Command="{Binding ToggleOcrCommand}" Classes.active="{Binding ShowOcr}" ToolTip.Tip="Extract text" AutomationProperties.Name="Extract text"><c:Icon Data="{DynamicResource IconOcr}" Size="17" /></Button>
+          <Button Classes="secondary" Command="{Binding CopyCommand}" IsEnabled="{Binding !IsBusy}" ToolTip.Tip="Copy the edited image (Ctrl+C)">
+            <StackPanel Orientation="Horizontal" Spacing="7"><c:Icon Data="{DynamicResource IconCopy}" Size="16" /><TextBlock Text="Copy" /></StackPanel>
+          </Button>
+          <Button Classes="secondary" Command="{Binding ExportCommand}" IsEnabled="{Binding !IsBusy}" ToolTip.Tip="Export to a file (Ctrl+E)">
+            <StackPanel Orientation="Horizontal" Spacing="7"><c:Icon Data="{DynamicResource IconExport}" Size="16" /><TextBlock Text="Export" /></StackPanel>
+          </Button>
+          <Button Classes="secondary" Command="{Binding SaveAsNewCommand}" IsEnabled="{Binding !IsBusy}" ToolTip.Tip="Add the edited image to your library as a new screenshot (Ctrl+Shift+S)">
+            <StackPanel Orientation="Horizontal" Spacing="7"><c:Icon Data="{DynamicResource IconPlus}" Size="16" /><TextBlock Text="Save as new" /></StackPanel>
+          </Button>
+          <Button Classes="primary" Command="{Binding SaveCommand}" ToolTip.Tip="Save edits (Ctrl+S). Edits are also saved when you leave.">
+            <StackPanel Orientation="Horizontal" Spacing="7"><c:Icon Data="{DynamicResource IconSave}" Size="16" /><TextBlock Text="Save" Foreground="{DynamicResource OnAccentBrush}" /></StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Workspace -->
+    <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto">
+      <!-- Tool rail -->
+      <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0" Width="56">
+        <ScrollViewer VerticalScrollBarVisibility="Hidden">
+          <ItemsControl ItemsSource="{Binding ToolButtons}" Margin="0,10">
+            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="4" HorizontalAlignment="Center" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ToolButtonViewModel">
+                <Button Classes="icon" Classes.active="{Binding IsActive}" Width="38" Height="38"
+                        Command="{Binding $parent[UserControl].((vm:EditorViewModel)DataContext).SetToolCommand}" CommandParameter="{Binding Info.Tool}"
+                        ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Info.Name}">
+                  <c:Icon Data="{Binding Icon}" Size="19" />
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Border>
+
+      <!-- Canvas -->
+      <Grid Grid.Column="1" Background="{DynamicResource CanvasBrush}">
+        <c:EditorCanvas x:Name="EditorSurface" Editor="{Binding}" />
+        <Canvas x:Name="OverlayLayer" IsHitTestVisible="True" />
+
+        <StackPanel IsVisible="{Binding IsLoading}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+          <ProgressBar IsIndeterminate="True" Width="160" />
+          <TextBlock Text="Opening image…" Classes="secondary" HorizontalAlignment="Center" />
+        </StackPanel>
+
+        <c:EmptyState IsVisible="{Binding LoadError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Icon="{DynamicResource IconImageOff}"
+                      Title="Can't open this image" Description="{Binding LoadError}">
+          <Button Classes="secondary" Content="Back to library" Command="{Binding GoBackCommand}" />
+        </c:EmptyState>
+      </Grid>
+
+      <!-- Properties -->
+      <Border Grid.Column="2" Classes="panel" Width="272">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Margin="16,14,16,18" Spacing="18">
+
+            <StackPanel Spacing="10" IsVisible="{Binding UsesColor}">
+              <TextBlock Text="Color" Classes="sectionLabel" />
+              <ItemsControl ItemsSource="{Binding Colors}">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ColorChoice">
+                    <Button Width="32" Height="32" Margin="0,0,8,8" Padding="0" CornerRadius="16" Background="Transparent"
+                            BorderThickness="2" BorderBrush="Transparent"
+                            Command="{Binding $parent[UserControl].((vm:EditorViewModel)DataContext).PickColorCommand}" CommandParameter="{Binding}"
+                            Classes.picked="{Binding IsSelected}"
+                            AutomationProperties.Name="Annotation color">
+                      <Ellipse Width="22" Height="22" Fill="{Binding Brush}" Stroke="{DynamicResource BorderStrongBrush}" StrokeThickness="1" />
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+            <StackPanel Spacing="8" IsVisible="{Binding UsesStroke}">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="Stroke / text size" Classes="sectionLabel" />
+                <TextBlock Grid.Column="1" Text="{Binding StrokeWidth, StringFormat={}{0:0}}" Classes="caption secondary" />
+              </Grid>
+              <Slider Minimum="1" Maximum="16" Value="{Binding StrokeWidth}" TickFrequency="1" IsSnapToTickEnabled="True" AutomationProperties.Name="Stroke width" />
+            </StackPanel>
+
+            <StackPanel Spacing="8" IsVisible="{Binding HasCrop}">
+              <TextBlock Text="Crop" Classes="sectionLabel" />
+              <Button Classes="secondary" Command="{Binding ResetCropCommand}" HorizontalAlignment="Stretch" Content="Reset crop" />
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+              <TextBlock Text="Output size" Classes="sectionLabel" />
+              <ItemsControl ItemsSource="{Binding ScaleOptions}">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:Int32">
+                    <Button Classes="secondary" Margin="0,0,6,6" Padding="10,4" MinHeight="30" Content="{Binding StringFormat={}{0}%}"
+                            Command="{Binding $parent[UserControl].((vm:EditorViewModel)DataContext).SetScaleCommand}" CommandParameter="{Binding}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Classes="caption secondary"><Run Text="Result: " /><Run Text="{Binding SizeText}" /></TextBlock>
+            </StackPanel>
+
+            <Button Classes="danger" Command="{Binding DeleteSelectedCommand}" HorizontalAlignment="Stretch" IsVisible="{Binding SelectedId, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center"><c:Icon Data="{DynamicResource IconTrash}" Size="15" /><TextBlock Text="Delete selected" Foreground="{DynamicResource ErrorBrush}" /></StackPanel>
+            </Button>
+
+            <StackPanel IsVisible="{Binding ShowOcr}" Spacing="12">
+              <Border Classes="divider" />
+              <v:OcrPanel DataContext="{Binding Ocr}" />
+            </StackPanel>
+
+            <Border Classes="divider" />
+            <StackPanel Spacing="4">
+              <TextBlock Text="Tips" Classes="sectionLabel" />
+              <TextBlock Classes="caption secondary" TextWrapping="Wrap"
+                         Text="Hold Shift for squares and 45° arrows. Space + drag (or middle mouse) pans. Ctrl + wheel zooms. Double-click text to edit it." />
+              <TextBlock Classes="caption secondary" TextWrapping="Wrap" Text="Your original image is never changed. Edits are saved automatically." />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+
+    <!-- Status -->
+    <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="14,6">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding SizeText}" Classes="caption secondary" />
+        <TextBlock Grid.Column="1" Text="Blur and pixelate are applied permanently to exports; the original file is untouched." Classes="caption tertiary" />
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

@@ -1,0 +1,77 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Snaply.App.ViewModels"
+             xmlns:c="using:Snaply.App.Controls"
+             xmlns:v="using:Snaply.App.Views"
+             x:Class="Snaply.App.Views.GalleryPage"
+             x:DataType="vm:GalleryViewModel">
+  <UserControl.Styles>
+    <Style Selector="UserControl.compact Border#DetailsHost">
+      <Setter Property="Grid.Column" Value="0" />
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="BoxShadow" Value="{DynamicResource ElevationMd}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid ColumnDefinitions="*,Auto">
+    <Grid RowDefinitions="Auto,*">
+      <!-- Header -->
+      <StackPanel Margin="28,24,28,12" Spacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Spacing="2">
+            <TextBlock Text="{Binding Title}" Classes="title" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="{Binding CountText}" Classes="secondary" />
+          </StackPanel>
+        </Grid>
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+          <TextBox Text="{Binding SearchText}" Watermark="Search by file name or text in the image" AutomationProperties.Name="Search screenshots">
+            <TextBox.InnerLeftContent>
+              <c:Icon Data="{DynamicResource IconSearch}" Size="16" Margin="10,0,0,0" />
+            </TextBox.InnerLeftContent>
+            <TextBox.InnerRightContent>
+              <Button Classes="icon" Width="26" Height="26" Margin="0,0,4,0" Command="{Binding ClearFiltersCommand}" IsVisible="{Binding HasFilters}" ToolTip.Tip="Clear search and filters" AutomationProperties.Name="Clear filters">
+                <c:Icon Data="{DynamicResource IconClose}" Size="13" />
+              </Button>
+            </TextBox.InnerRightContent>
+          </TextBox>
+          <ComboBox Grid.Column="1" ItemsSource="{Binding FormatOptions}" SelectedItem="{Binding SelectedFormat}" MinWidth="130" AutomationProperties.Name="Filter by format">
+            <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FilterOption"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+          <ComboBox Grid.Column="2" ItemsSource="{Binding DateOptions}" SelectedItem="{Binding SelectedDate}" MinWidth="140" AutomationProperties.Name="Filter by date">
+            <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FilterOption"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+        </Grid>
+      </StackPanel>
+
+      <!-- Grid -->
+      <Grid Grid.Row="1">
+        <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Disabled" Padding="28,4,14,24">
+          <StackPanel>
+            <ItemsControl ItemsSource="{Binding Items}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ScreenshotItemViewModel">
+                  <c:ScreenshotTile Margin="0,0,14,14" ClickCommand="{Binding $parent[UserControl].((vm:GalleryViewModel)DataContext).SelectCommand}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <ProgressBar IsIndeterminate="True" IsVisible="{Binding IsLoading}" Height="3" Margin="0,8,0,0" />
+          </StackPanel>
+        </ScrollViewer>
+
+        <c:EmptyState IsVisible="{Binding ShowEmptyLibrary}" Icon="{DynamicResource IconImages}" Title="{Binding EmptyTitle}" Description="{Binding EmptyHint}" />
+        <c:EmptyState IsVisible="{Binding ShowNoResults}" Icon="{DynamicResource IconSearch}" Title="No matching screenshots" Description="Try a different search or clear the filters.">
+          <Button Classes="secondary" Content="Clear filters" Command="{Binding ClearFiltersCommand}" />
+        </c:EmptyState>
+      </Grid>
+    </Grid>
+
+    <!-- Contextual panel: only present while a screenshot is selected -->
+    <Border x:Name="DetailsHost" Grid.Column="1" Classes="panel" Width="352" IsVisible="{Binding Details.IsOpen}">
+      <v:DetailsPanel DataContext="{Binding Details}" />
+    </Border>
+  </Grid>
+</UserControl>
