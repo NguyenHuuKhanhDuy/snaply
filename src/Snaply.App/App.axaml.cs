@@ -57,7 +57,14 @@ public partial class App : Application
             var main = _services.GetRequiredService<MainViewModel>();
             SyncStartupRegistration(settings.Current);
 
+            AppLogo.Initialise(settings.Current.AppIcon);
             var window = new MainWindow { DataContext = main };
+            if (AppLogo.CurrentId != AppLogo.DefaultId) window.Icon = AppLogo.LoadIcon(AppLogo.CurrentId, 64);
+            AppLogo.Changed += () =>
+            {
+                window.Icon = AppLogo.LoadIcon(AppLogo.CurrentId, 64);
+                if (_tray is not null) _tray.Icon = AppLogo.LoadIcon(AppLogo.CurrentId, 32);
+            };
             desktop.MainWindow = window;
             SetupBackgroundMode(desktop, window);
 
@@ -95,7 +102,6 @@ public partial class App : Application
 
         try
         {
-            using var icon = AssetLoader.Open(new Uri("avares://Snaply/Assets/snaply-32.png"));
             var menu = new NativeMenu();
             var open = new NativeMenuItem("Open Snaply");
             open.Click += (_, _) => Dispatcher.UIThread.Post(AppWindowController.ShowMainWindow);
@@ -107,7 +113,7 @@ public partial class App : Application
             quit.Click += (_, _) => Dispatcher.UIThread.Post(() => Quit(desktop));
             menu.Add(open); menu.Add(new NativeMenuItemSeparator()); menu.Add(region); menu.Add(full); menu.Add(new NativeMenuItemSeparator()); menu.Add(quit);
 
-            _tray = new TrayIcon { Icon = new WindowIcon(icon), ToolTipText = "Snaply", Menu = menu, IsVisible = true };
+            _tray = new TrayIcon { Icon = AppLogo.LoadIcon(AppLogo.CurrentId, 32), ToolTipText = "Snaply", Menu = menu, IsVisible = true };
             _tray.Clicked += (_, _) => Dispatcher.UIThread.Post(AppWindowController.ShowMainWindow);
             TrayIcon.SetIcons(this, new TrayIcons { _tray });
             _trayAvailable = true;

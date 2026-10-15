@@ -54,9 +54,7 @@
               BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0" IsVisible="{Binding ShowShell}" ClipToBounds="True">
         <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="12,14,12,12">
           <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,0,0,14" Height="32">
-            <Border Width="32" Height="32" CornerRadius="8" Background="{DynamicResource BorderBrush}" VerticalAlignment="Center">
-              <c:Icon Data="{DynamicResource IconCapture}" Size="18" Stroke="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </Border>
+            <Image x:Name="SidebarLogo" Width="32" Height="32" VerticalAlignment="Center" RenderOptions.BitmapInterpolationMode="HighQuality" AutomationProperties.AccessibilityView="Raw" />
             <TextBlock Grid.Column="1" Text="Snaply" Classes="subtitle hideWhenCollapsed" VerticalAlignment="Center" Margin="10,0,0,0" />
             <Button Grid.Column="2" Classes="icon hideWhenCollapsed" Command="{Binding ToggleSidebarCommand}" ToolTip.Tip="Collapse sidebar" AutomationProperties.Name="Collapse sidebar">
               <c:Icon Data="{DynamicResource IconSidebar}" Size="16" />

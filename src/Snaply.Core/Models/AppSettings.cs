@@ -7,6 +7,8 @@ public sealed class AppSettings
     public ThemeMode Theme { get; set; } = ThemeMode.System;
     /// <summary>Colour theme id (see ColorPalettes); unknown or empty means the default blue.</summary>
     public string ColorTheme { get; set; } = "default";
+    /// <summary>App logo id shown in the window, taskbar and tray: "frame" (default), "crop-s" or "handle"; unknown means the default.</summary>
+    public string AppIcon { get; set; } = "frame";
     public string? SaveDirectory { get; set; }
     public ImageFormat DefaultFormat { get; set; } = ImageFormat.Png;
     public bool CopyToClipboardAfterCapture { get; set; }
@@ -46,7 +48,7 @@ public sealed class AppSettings
 
     public AppSettings Clone() => new()
     {
-        Theme = Theme, ColorTheme = ColorTheme, SaveDirectory = SaveDirectory, DefaultFormat = DefaultFormat,
+        Theme = Theme, ColorTheme = ColorTheme, AppIcon = AppIcon, SaveDirectory = SaveDirectory, DefaultFormat = DefaultFormat,
         CopyToClipboardAfterCapture = CopyToClipboardAfterCapture, SaveToLibraryAfterCapture = SaveToLibraryAfterCapture, EditAfterSelection = EditAfterSelection,
         OpenEditorAfterCapture = OpenEditorAfterCapture, DefaultCaptureTool = DefaultCaptureTool, FullScreenTarget = FullScreenTarget,
         CaptureDelaySeconds = CaptureDelaySeconds, ReduceMotion = ReduceMotion,

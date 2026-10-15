@@ -78,6 +78,22 @@ public sealed partial class ColorThemeOption : ObservableObject
     public void Refresh(bool dark) => Brush = dark ? DarkBrush : LightBrush;
 }
 
+/// <summary>One logo in the Appearance picker.</summary>
+public sealed partial class AppLogoOption : ObservableObject
+{
+    public AppLogoOption(AppLogoInfo info)
+    {
+        Id = info.Id; Name = info.Name; Description = info.Description;
+        Preview = AppLogo.LoadBitmap(info.Id, 64);
+    }
+
+    public string Id { get; }
+    public string Name { get; }
+    public string Description { get; }
+    public Avalonia.Media.Imaging.Bitmap Preview { get; }
+    [ObservableProperty] private bool _isSelected;
+}
+
 public sealed partial class RedactionRuleRow : ObservableObject
 {
     private readonly SettingsViewModel _owner;
@@ -243,6 +259,21 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     [RelayCommand] private void PickColorTheme(ColorThemeOption? option) { if (option is not null) SelectedColorTheme = option; }
 
+    // ---- app logo ----
+    public ObservableCollection<AppLogoOption> Logos { get; } = new(AppLogo.All.Select(l => new AppLogoOption(l)));
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(SelectedLogoName))] private AppLogoOption _selectedLogo = null!;
+    public string SelectedLogoName => SelectedLogo is null ? "" : $"{SelectedLogo.Name}: {SelectedLogo.Description}";
+
+    partial void OnSelectedLogoChanged(AppLogoOption value)
+    {
+        foreach (var l in Logos) l.IsSelected = ReferenceEquals(l, value);
+        if (_loading || value is null) return;
+        AppLogo.Apply(value.Id);                                        // live: window, taskbar, tray and sidebar change at once
+        _ = ApplyAsync(s => s.AppIcon = value.Id);
+    }
+
+    [RelayCommand] private void PickLogo(AppLogoOption? option) { if (option is not null) SelectedLogo = option; }
+
     internal void OnRedactionRuleToggled()
     {
         if (_loading) return;
@@ -290,6 +321,7 @@ public sealed partial class SettingsViewModel : ViewModelBase
             AutoCheckUpdates = s.AutoCheckUpdates;
             RunInBackground = s.RunInBackground;
             SelectedColorTheme = ColorThemes.FirstOrDefault(t => string.Equals(t.Id, s.ColorTheme, StringComparison.OrdinalIgnoreCase)) ?? ColorThemes[0];
+            SelectedLogo = Logos.FirstOrDefault(l => string.Equals(l.Id, s.AppIcon, StringComparison.OrdinalIgnoreCase)) ?? Logos[0];
             StartWithWindows = s.StartWithWindows;
             RememberSourceWindow = s.RememberSourceWindow;
             SaveDirectory = _settings.EffectiveSaveDirectory;

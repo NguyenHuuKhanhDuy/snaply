@@ -18,6 +18,10 @@ public partial class MainWindow : Window
             if (e.Property == BoundsProperty && DataContext is MainViewModel vm) vm.SetCompact(Bounds.Width < CompactWidth);
         };
         KeyDown += OnKeyDown;
+        void ShowLogo() => SidebarLogo.Source = AppLogo.LoadBitmap(AppLogo.CurrentId, 64);
+        ShowLogo();
+        AppLogo.Changed += ShowLogo;
+        Closed += (_, _) => AppLogo.Changed -= ShowLogo;
         // Shortcut recording is caught at window level (tunnelling): the focused control disappears when recording starts,
         // so a handler on the settings page would never see the key.
         AddHandler(KeyDownEvent, OnRecordKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
