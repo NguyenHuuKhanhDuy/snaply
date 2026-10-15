@@ -77,6 +77,18 @@ jobs:
           vpk pack -u ${{ env.APP_ID }} -v ${{ env.VERSION }} -p publish
           -e ${{ env.APP_EXE }} --packTitle ${{ env.APP_TITLE }} -i ${{ env.ICON }} -o Releases
 
+      # Installer and portable files get the version in their name (Snaply-1.2.3-...). Update packages already carry it and the feed files must keep their names.
+      - name: Put the version in installer file names
+        shell: bash
+        run: |
+          cd Releases
+          for f in *Setup* *Portable* *.AppImage *.pkg; do
+            [[ -f "$f" ]] || continue
+            new="${f/${APP_ID}-/Snaply-${VERSION}-}"
+            [[ "$new" == "$f" ]] && new="Snaply-${VERSION}-$f"
+            mv "$f" "$new"; echo "$f -> $new"
+          done
+
       - name: Upload to GitHub
         if: startsWith(github.ref, 'refs/tags/v')
         run: >
@@ -103,4 +115,122 @@ jobs:
           else
             echo "::error::$url (HTTP $code) does not list $VERSION, so installed apps will not detect this update."
           fi
+          exit 1
+
+  # macOS and Linux packages. They run after the Windows job so a release only gets them when the tests passed there, and the GitHub release
+  # already exists (each OS adds its own files and its own update feed: releases.osx.json / releases.linux.json).
+  # These platforms are implemented but not yet verified on real machines; the macOS build is unsigned.
+  build-other-platforms:
+    needs: build-and-release
+    strategy:
+      fail-fast: false
+      max-parallel: 1          # one upload at a time into the same release
+      matrix:
+        include:
+          - name: macOS (Apple Silicon)
+            os: macos-latest
+            rid: osx-arm64
+            channel: osx-arm64
+            kind: osx
+          - name: macOS (Intel)
+            os: macos-15-intel
+            rid: osx-x64
+            channel: osx-x64
+            kind: osx
+          - name: Linux
+            os: ubuntu-latest
+            rid: linux-x64
+            channel: linux
+            kind: linux
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION=0.0.1-ci.$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish
+        run: >
+          dotnet publish ${{ env.PROJECT }} -c Release -r ${{ matrix.rid }} --self-contained true
+          -p:Version=${{ env.VERSION }} -o publish
+
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk --version ${{ env.VELOPACK_VERSION }}
+
+      # macOS wants an .icns; build it from the PNG sizes the app already ships.
+      - name: Make macOS icon
+        if: matrix.kind == 'osx'
+        run: |
+          set=Snaply.iconset
+          mkdir "$set"
+          a=src/Snaply.App/Assets
+          cp $a/snaply-16.png  "$set/icon_16x16.png"
+          cp $a/snaply-32.png  "$set/icon_16x16@2x.png"
+          cp $a/snaply-32.png  "$set/icon_32x32.png"
+          cp $a/snaply-64.png  "$set/icon_32x32@2x.png"
+          cp $a/snaply-128.png "$set/icon_128x128.png"
+          cp $a/snaply-256.png "$set/icon_128x128@2x.png"
+          cp $a/snaply-256.png "$set/icon_256x256.png"
+          cp $a/snaply-512.png "$set/icon_256x256@2x.png"
+          cp $a/snaply-512.png "$set/icon_512x512.png"
+          iconutil -c icns "$set" -o Snaply.icns
+          echo "PACK_ICON=Snaply.icns" >> "$GITHUB_ENV"
+
+      - name: Pick Linux icon
+        if: matrix.kind == 'linux'
+        run: echo "PACK_ICON=src/Snaply.App/Assets/snaply-256.png" >> "$GITHUB_ENV"
+
+      - name: Download previous release
+        run: vpk download github --repoUrl "${{ env.REPO_URL }}" --token ${{ secrets.GITHUB_TOKEN }} --channel ${{ matrix.channel }} -o Releases
+        continue-on-error: true
+
+      - name: Pack
+        run: >
+          vpk pack -u ${{ env.APP_ID }} -v ${{ env.VERSION }} -p publish --channel ${{ matrix.channel }}
+          -e Snaply --packTitle ${{ env.APP_TITLE }} -i ${{ env.PACK_ICON }} -o Releases
+
+      # Installer and portable files get the version in their name (Snaply-1.2.3-...). Update packages already carry it and the feed files must keep their names.
+      - name: Put the version in installer file names
+        shell: bash
+        run: |
+          cd Releases
+          for f in *Setup* *Portable* *.AppImage *.pkg; do
+            [[ -f "$f" ]] || continue
+            new="${f/${APP_ID}-/Snaply-${VERSION}-}"
+            [[ "$new" == "$f" ]] && new="Snaply-${VERSION}-$f"
+            mv "$f" "$new"; echo "$f -> $new"
+          done
+
+      - name: Upload to GitHub
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: >
+          vpk upload github --repoUrl "${{ env.REPO_URL }}" --token ${{ secrets.GITHUB_TOKEN }} --channel ${{ matrix.channel }}
+          -o Releases --merge --publish true --releaseName "${{ env.APP_TITLE }} v${{ env.VERSION }}" --tag ${{ github.ref_name }}
+
+      - name: Verify release is visible to the updater
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          url="$REPO_URL/releases/latest/download/releases.${{ matrix.channel }}.json"
+          for attempt in 1 2 3 4 5 6; do
+            code=$(curl -sL -o feed.json -w "%{http_code}" "$url" || true)
+            if [[ "$code" == "200" ]] && grep -qF "\"Version\":\"$VERSION\"" feed.json; then
+              echo "Feed lists $VERSION (attempt $attempt)"
+              exit 0
+            fi
+            echo "Attempt $attempt: HTTP $code, feed does not list $VERSION yet"
+            sleep 10
+          done
+          echo "::error::$url (HTTP $code) does not list $VERSION, so installed apps will not detect this update."
           exit 1

@@ -31,7 +31,11 @@ public sealed class VelopackUpdateService : IAppUpdateService
 
         try
         {
-            _manager = new UpdateManager(new GithubSource(repoUrl, null, false));
+            // Apple Silicon and Intel Macs have separate packages, so each gets its own feed (release workflow: osx-arm64 / osx-x64).
+            var options = OperatingSystem.IsMacOS()
+                ? new UpdateOptions { ExplicitChannel = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64 ? "osx-arm64" : "osx-x64" }
+                : null;
+            _manager = new UpdateManager(new GithubSource(repoUrl, null, false), options);
             if (!_manager.IsInstalled)
             {
                 UnsupportedReason = "Updates are only available in the installed version of Snaply. This build was not installed with the Snaply installer.";
