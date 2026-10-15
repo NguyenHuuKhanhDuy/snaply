@@ -72,8 +72,14 @@ public partial class App : Application
             // Without a tray there would be no way back to a hidden window, so then it opens normally.
             var startHidden = Program.InitialCommand == StartupCommand.Background && settings.Current.RunInBackground && _trayAvailable;
             if (startHidden) { window.Opacity = 0; window.ShowInTaskbar = false; }
+            // Opened is raised every time the window is shown again (tray, shortcut), not only the first time. Startup work must run once:
+            // otherwise a window opened from the tray after a hidden start would be hidden again at once, and shortcuts, update checks and
+            // the start command would be set up a second time.
+            var openedOnce = false;
             window.Opened += async (_, _) =>
             {
+                if (openedOnce) return;
+                openedOnce = true;
                 if (startHidden) { window.Hide(); window.Opacity = 1; window.ShowInTaskbar = true; }
                 await OnWindowOpenedAsync(main);
             };
