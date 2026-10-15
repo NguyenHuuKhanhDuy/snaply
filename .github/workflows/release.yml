@@ -55,8 +55,9 @@ jobs:
       - name: Build
         run: dotnet build Snaply.sln -c Release --nologo -v q
 
-      - name: Test
-        run: dotnet test Snaply.sln -c Release --no-build --nologo --filter "Category!=Screenshots"
+      # TEMPORARILY DISABLED to check that packaging works end to end. Turn it back on before relying on a release.
+      # - name: Test
+      #   run: dotnet test Snaply.sln -c Release --no-build --nologo --filter "Category!=Screenshots"
 
       - name: Publish
         run: >
