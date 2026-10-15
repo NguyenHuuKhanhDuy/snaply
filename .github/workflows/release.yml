@@ -77,23 +77,30 @@ jobs:
           vpk pack -u ${{ env.APP_ID }} -v ${{ env.VERSION }} -p publish
           -e ${{ env.APP_EXE }} --packTitle ${{ env.APP_TITLE }} -i ${{ env.ICON }} -o Releases
 
-      # Installer and portable files get the version in their name (Snaply-1.2.3-...). Update packages already carry it and the feed files must keep their names.
-      - name: Put the version in installer file names
-        shell: bash
-        run: |
-          cd Releases
-          for f in *Setup* *Portable* *.AppImage *.pkg; do
-            [[ -f "$f" ]] || continue
-            new="${f/${APP_ID}-/Snaply-${VERSION}-}"
-            [[ "$new" == "$f" ]] && new="Snaply-${VERSION}-$f"
-            mv "$f" "$new"; echo "$f -> $new"
-          done
-
       - name: Upload to GitHub
         if: startsWith(github.ref, 'refs/tags/v')
         run: >
           vpk upload github --repoUrl "${{ env.REPO_URL }}" --token ${{ secrets.GITHUB_TOKEN }}
           -o Releases --publish true --releaseName "${{ env.APP_TITLE }} v${{ env.VERSION }}" --tag ${{ github.ref_name }}
+
+      # vpk uploads under its own file names (the feed refers to them), so the version is added by renaming the installer and portable
+      # assets on the release afterwards. Update packages already carry the version and the feed files must keep their names.
+      - name: Put the version in installer file names
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" --jq '.assets[] | "\(.id) \(.name)"' | while read -r id name; do
+            case "$name" in
+              Snaply-*) continue ;;
+              *Setup*|*Portable*|*.AppImage|*.pkg)
+                new="${name/${APP_ID}-/Snaply-${VERSION}-}"
+                [[ "$new" == "$name" ]] && new="Snaply-${VERSION}-$name"
+                gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/assets/$id" -f name="$new" > /dev/null
+                echo "$name -> $new" ;;
+            esac
+          done
 
       # The in-app updater reads this feed anonymously, exactly like this step. Retry briefly: GitHub's CDN can lag a few seconds.
       - name: Verify release is visible to the updater
@@ -200,23 +207,30 @@ jobs:
           vpk pack -u ${{ env.APP_ID }} -v ${{ env.VERSION }} -p publish --channel ${{ matrix.channel }}
           -e Snaply --packTitle ${{ env.APP_TITLE }} -i ${{ env.PACK_ICON }} -o Releases
 
-      # Installer and portable files get the version in their name (Snaply-1.2.3-...). Update packages already carry it and the feed files must keep their names.
-      - name: Put the version in installer file names
-        shell: bash
-        run: |
-          cd Releases
-          for f in *Setup* *Portable* *.AppImage *.pkg; do
-            [[ -f "$f" ]] || continue
-            new="${f/${APP_ID}-/Snaply-${VERSION}-}"
-            [[ "$new" == "$f" ]] && new="Snaply-${VERSION}-$f"
-            mv "$f" "$new"; echo "$f -> $new"
-          done
-
       - name: Upload to GitHub
         if: startsWith(github.ref, 'refs/tags/v')
         run: >
           vpk upload github --repoUrl "${{ env.REPO_URL }}" --token ${{ secrets.GITHUB_TOKEN }} --channel ${{ matrix.channel }}
           -o Releases --merge --publish true --releaseName "${{ env.APP_TITLE }} v${{ env.VERSION }}" --tag ${{ github.ref_name }}
+
+      # vpk uploads under its own file names (the feed refers to them), so the version is added by renaming the installer and portable
+      # assets on the release afterwards. Update packages already carry the version and the feed files must keep their names.
+      - name: Put the version in installer file names
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" --jq '.assets[] | "\(.id) \(.name)"' | while read -r id name; do
+            case "$name" in
+              Snaply-*) continue ;;
+              *Setup*|*Portable*|*.AppImage|*.pkg)
+                new="${name/${APP_ID}-/Snaply-${VERSION}-}"
+                [[ "$new" == "$name" ]] && new="Snaply-${VERSION}-$name"
+                gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/assets/$id" -f name="$new" > /dev/null
+                echo "$name -> $new" ;;
+            esac
+          done
 
       - name: Verify release is visible to the updater
         if: startsWith(github.ref, 'refs/tags/v')
