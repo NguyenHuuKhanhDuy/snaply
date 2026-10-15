@@ -38,6 +38,13 @@ public sealed class NotificationService : INotificationService
     {
         Dispatcher.UIThread.Post(() =>
         {
+            // Snaply's own window is usually hidden right after a capture, so a toast inside it would never be seen: show a floating one.
+            if (kind is NotificationKind.Success or NotificationKind.Info && !MainWindowInUse())
+            {
+                QuickToast.Show(title, message);
+                return;
+            }
+
             var toast = new ToastItem(kind, title, message, Remove);
             Toasts.Add(toast);
             while (Toasts.Count > MaxVisible) Toasts.RemoveAt(0);
@@ -46,6 +53,10 @@ public sealed class NotificationService : INotificationService
             _ = Task.Delay(lifetime).ContinueWith(_ => Dispatcher.UIThread.Post(() => Remove(toast)), TaskScheduler.Default);
         });
     }
+
+    private static bool MainWindowInUse() =>
+        (Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime)?.MainWindow
+            is { IsVisible: true, IsActive: true, WindowState: not Avalonia.Controls.WindowState.Minimized };
 
     private void Remove(ToastItem toast) => Toasts.Remove(toast);
 }

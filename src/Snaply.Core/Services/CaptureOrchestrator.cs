@@ -80,14 +80,14 @@ public sealed class CaptureOrchestrator
         if (result.IsSuccess)
         {
             var o = result.Value;
-            var what = (o.Saved, o.CopiedToClipboard) switch
+            var title = (o.Saved, o.CopiedToClipboard) switch
             {
-                (not null, true) => "Saved to library and copied to clipboard",
+                (not null, true) => "Saved and copied to clipboard",
                 (not null, false) => "Saved to library",
                 (null, true) => "Copied to clipboard",
-                _ => "Captured",
+                _ => "Screenshot captured",
             };
-            _notifications.Show(NotificationKind.Success, "Screenshot captured", what);
+            _notifications.Show(NotificationKind.Success, title);
         }
         else if (!result.IsCancelled)
         {
